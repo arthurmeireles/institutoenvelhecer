@@ -1,0 +1,18 @@
+.header {
+  width: 100%;
+  margin-top: 97px;
+}
+
+.header-container {
+  background: url(../img/13009.jpg) no-repeat center center;
+  -webkit-background-size: cover;
+  -moz-background-size: cover;
+  -o-background-size: cover;
+  background-size: cover;
+  padding: 50px 0 300px 0;
+  height: auto;
+  background-image: url("../../assets/img/13009.jpg");
+  padding-top: 100px;
+  padding-bottom: 175px;
+}
+

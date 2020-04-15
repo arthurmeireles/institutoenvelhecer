@@ -1,0 +1,29 @@
+.copyright {
+  background-color: rgb(0,84,122);
+  height: 60px;
+  width: 100%;
+  color: white;
+}
+
+.content {
+  margin: auto;
+  width: 100%;
+  border: none;
+  color: white;
+  text-align: center;
+  height: inherit;
+  padding-top: 15px;
+}
+
+*, *:before, *:after {
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+*, *:before, *:after {
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
