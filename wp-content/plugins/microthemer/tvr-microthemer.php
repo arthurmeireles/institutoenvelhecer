@@ -5,7 +5,7 @@ Plugin URI: https://themeover.com/microthemer
 Text Domain: microthemer
 Domain Path: /languages
 Description: Microthemer is a feature-rich visual design plugin for customizing the appearance of ANY WordPress Theme or Plugin Content (e.g. posts, pages, contact forms, headers, footers, sidebars) down to the smallest detail. For CSS coders, Microthemer is a proficiency tool that allows them to rapidly restyle a WordPress theme or plugin. For non-coders, Microthemer's intuitive point and click editing opens the door to advanced theme and plugin customization.
-Version: 6.1.1.6
+Version: 6.1.5.9
 Author: Themeover
 Author URI: https://themeover.com
 */
@@ -45,6 +45,11 @@ if (!defined('UNQ_BASE')) {
 // common class for data needed by front and admin
 if (!class_exists('tvr_common')) {
 	class tvr_common {
+
+		public static function get_protocol(){
+			$isSSL = (!empty($_SERVER["HTTPS"]) and $_SERVER["HTTPS"] == "on");
+			return 'http' . ($isSSL ? 's' : '') . '://';
+		}
 
 	    public static function get_custom_code(){
 			return array(
@@ -88,6 +93,25 @@ if (!class_exists('tvr_common')) {
 			);
 		}
 
+		// add a param to an existing url if it doesn't exist, using the correct joining char
+        public static function append_url_param($url, $param, $val = false){
+
+            // bail if already present
+            if (strpos($url, $param) !== false){
+                return $url;
+            }
+
+            // we do need to add param, so determine joiner
+            $joiner = strpos($url, '?') !== false ? '&': '?';
+
+            // is there param val?
+	        $param = $val ? $param.'='.$val : $param;
+
+            // return new url
+            return $url . $joiner . $param;
+
+        }
+
 		// strip a single parameter from an url (adapted from JS function)
 		public static function strip_url_param($url, $param, $withVal = true){
 
@@ -111,20 +135,94 @@ if (!class_exists('tvr_common')) {
 			return $url;
 		}
 
-		// strip preview= and page builder parameters
-		public static function strip_page_builder_and_preview_params($url){
+		public static function params_to_strip(){
+			return array(
+				array(
+					'param' => '_wpnonce',
+					'withVal' => true,
+				),
+			    array(
+                    'param' => 'mt_nonlog',
+                    'withVal' => false,
+                ),
+                array(
+				     'param' => 'brizy-edit-iframe', // strip brizy
+				     'withVal' => false,
+			     ),
+                array(
+	                'param' => 'et_fb', // strip Divi param which causes iframe to break out of parent
+	                'withVal' => true,
+                ),
+                array(
+	                'param' => 'fl_builder', // strip beaver builder
+	                'withVal' => false,
+                ),
+				// oxygen params
+				array(
+					'param' => 'ct_builder',
+					'withVal' => true,
+                    'unless' => array('ct_template') // ct_template also requires ct_builder to work
+				),
+				array(
+					'param' => 'ct_inner',
+					'withVal' => true,
+				),
+				/* Keep as necessary for showing specific content
+				 * array(
+					'param' => 'ct_template',
+					'withVal' => true,
+				),*/
+				array(
+					'param' => 'oxygen_iframe',
+					'withVal' => true,
+				),
 
-		    // strip preview
+               // elementor doesn't pass a parameter to the frontend it runs on the admin side
+
+			);
+		}
+
+		// we don't strip params that are required when another param is present
+		public static function has_excluded_param($url, $array){
+
+			$unless = !empty($array['unless']) ? $array['unless'] : false;
+			if ($unless){
+				foreach ($unless as $i => $excl){
+					if (strpos($url, $excl) !== false){
+						return true;
+					}
+				}
+			}
+
+			return false;
+		}
+
+		// strip preview= and page builder parameters
+		public static function strip_page_builder_and_other_params($url){
+
+		    // strip preview params (regular and elementor)
 			$url = tvr_common::strip_preview_params($url);
 
+			$other_params = tvr_common::params_to_strip();
+
+			foreach ($other_params as $key => $array){
+
+			    // we don't strip params that are required when another param is present
+                if (tvr_common::has_excluded_param($url, $array)){
+                    continue;
+                }
+
+				$url = tvr_common::strip_url_param($url, $array['param'], $array['withVal']);
+            }
+
 			// strip brizy
-			$url = tvr_common::strip_url_param($url, 'brizy-edit-iframe', false);
+			/*$url = tvr_common::strip_url_param($url, 'brizy-edit-iframe', false);
 
 			// strip Divi param which causes iframe to break out of parent
 			$url = tvr_common::strip_url_param($url, 'et_fb', true); // this has issue with divi builder
 
 			// strip beaver builder - NO, we're currently checking fl_builder for JS logic.
-			//$url = tvr_common::strip_url_param($url, 'fl_builder', false);
+			$url = tvr_common::strip_url_param($url, 'fl_builder', false);*/
 
 			return $url;
 
@@ -214,7 +312,7 @@ if ( is_admin() ) {
 		// define
 		class tvr_microthemer_admin {
 
-			var $version = '6.1.1.6';
+			var $version = '6.1.5.9';
 			var $db_chg_in_ver = '6.0.6.5';
 			var $locale = '';
 			var $time = 0;
@@ -277,6 +375,7 @@ if ( is_admin() ) {
 			var $legacy_groups = array();
 			var $mob_preview = array();
 			var $propAliases = array();
+			var $input_wrap_templates = array();
 			// @var array $options Stores the "to be merged" options in
 			var $to_be_merged = array();
 			var $dis_text = '';
@@ -314,6 +413,7 @@ if ( is_admin() ) {
 			// set default custom code options (todo make use of this array throughout the program)
 			var $custom_code = array();
 			var $custom_code_flat = array();
+			var $params_to_strip = array();
 
 			// @var strings dir/url paths
 			var $wp_content_url = '';
@@ -363,7 +463,8 @@ if ( is_admin() ) {
 				load_plugin_textdomain( 'microthemer', false, dirname( plugin_basename(__FILE__) ) . '/languages/' );
 				//add_action('init', array($this, 'tvr_load_textdomain'));
 
-				add_action('wp_ajax_mtui', array(&$this, 'microthemer_ui_page'));
+
+				add_action('wp_ajax_mtui', array(&$this, 'microthemer_ajax_actions'));
 
 				// for media queries
 				$this->unq_base = uniqid();
@@ -461,21 +562,16 @@ if ( is_admin() ) {
 
 					// add scripts and styles
 					// Not necessary if this is an ajax call. XDEBUG_PROFILE showed add_js was adding sig time.
-					if (empty($_GET['action']) or $_GET['action'] != 'mtui'){
-						add_action('admin_init', array(&$this, 'add_css'));
-						add_action('admin_init', array(&$this, 'add_js'));
+					if ( empty($_GET['action']) or $_GET['action'] != 'mtui'){
+
+                        add_action('admin_init', array(&$this, 'add_css'));
+                        add_action('admin_head', array(&$this, 'add_dyn_inline_css'));
+                        add_action('admin_init', array(&$this, 'add_js'));
+
 						/*add_action('wp_print_scripts', array('tvr_common', 'dequeue_rogue_scripts'), 1000);
 						add_action('wp_footer', array('tvr_common', 'dequeue_rogue_scripts'), 1000);*/
 					} else {
 						//echo 'it is an ajax request';
-					}
-
-					/* PAGE SPECIFIC PHP PROCESSING (that must come before page is rendered) */
-					if ($page == $this->microthemeruipage or $page == $this->preferencespage){
-
-						// update preferences (because admin bar prefs can't be updated if called later)
-						add_action( 'admin_init', array(&$this, 'process_preferences_form'));
-
 					}
 
 				}
@@ -709,24 +805,56 @@ if ( is_admin() ) {
                 }
             }
 
+
+            // connect to themeoer directly or via proxy fallback
+            function connect_to_themeover($email, $proxy = false){
+
+	            $base_url = $proxy
+                    ? 'https://validate.themeover.com/'
+                    : 'https://themeover.com/wp-content/tvr-auto-update/validate.php';
+
+			    $params = 'email='.rawurlencode($email)
+	                      .'&domain='.$this->home_url
+	                      .'&mt_version='.$this->version;
+
+	            $url = $base_url.'?'.$params;
+	            $responseString = wp_remote_fopen($url);
+	            $response = json_decode($responseString, true);
+
+	            //$this->show_me.= 'The response'. $responseString;
+
+	            // if we have a valid result or we have already tried the fallback proxy script, return result
+	            if (!empty($response['message']) or $proxy){
+                    return $responseString;
+	            }
+
+	            // the initial connection was unsuccessful, possibly due to firewall rules, attempt proxy connection
+	            else {
+	                return $this->connect_to_themeover($email, true);
+                }
+
+            }
+
 			// check user can unlock / continue using MT
             function get_validation_response($email, $context = 'unlock'){
 
 			    $pref_array = array(
 			        'buyer_email' => $email
                 );
+	            $was_capped_version = $this->is_capped_version();
+	            $response = false;
 
                 // urlencode allows for Gmail + chars in email
-				$params = 'email='.rawurlencode($email)
+				/*$params = 'email='.rawurlencode($email)
 				          .'&domain='.$this->home_url
 				          .'&mt_version='.$this->version;
 
-	            $url = 'https://themeover.com/wp-content/tvr-auto-update/validate.php?'.$params;
-	            //$this->show_me.= $url;
-                $was_capped_version = $this->is_capped_version();
-				$response = false;
-	            $responseString = wp_remote_fopen($url);
+	            $url = 'https://themeover.com/wp-content/tvr-auto-update/validate.php?'.$params;*/
+	            //$responseString = wp_remote_fopen($url);
 
+	            $responseString = $this->connect_to_themeover($email);
+
+	            //$this->show_me.= $responseString;
 
 				// accommodate new json response format
 				if ( strpos($responseString, '{') !== false ){
@@ -746,11 +874,12 @@ if ( is_admin() ) {
 							$response_code  = esc_html($responseString);
 						}
 					}
+
 					$response['code'] = $response_code;
 
 					// if scheduled subscription check, log num tries and bail if deferring
                     if ($context == 'scheduled'){
-	                    $this->show_me.= $response['message'] = $this->log_subscription_check();
+                        $response['message'] = $this->log_subscription_check();
 	                    if ($response['message'] == 'defer'){
 		                    return false;
 	                    }
@@ -905,7 +1034,9 @@ if ( is_admin() ) {
 
 					            break;
 
+
 				            case "connection error":
+				            case "proxy connection error":
 				            case "subscription check failed":
 					            $code_message = !empty($response_code) ? 'HTTP response code: '.$response_code : '';
 					            $explain = '<p>The connection to themeover.com was unsuccessful. 
@@ -1697,14 +1828,16 @@ if ( is_admin() ) {
 					$this->write_mt_version_specific_js();
 				}
 
+				//$this->get_site_pages(); // for debug
+
 			}
 
 			// check_integrations (on the admin side)
 			function check_integrations(){
 
 				$check = array(
-					'beaver_builder' => 'bb-plugin/fl-builder.php',
-					'beaver_builder_lite' => 'beaver-builder-lite-version/fl-builder.php',
+					'FLBuilder' => 'bb-plugin/fl-builder.php',
+					'FLBuilder_lite' => 'beaver-builder-lite-version/fl-builder.php',
 					'elementor' => 'elementor/elementor.php',
 					'oxygen' => 'oxygen/functions.php'
 				);
@@ -1714,14 +1847,14 @@ if ( is_admin() ) {
 					if ( is_plugin_active( $plugin ) ) {
 
 					    // two versions of BB, try using same key
-						$key = ($key === 'beaver_builder_lite') ? 'beaver_builder' : $key;
+						$key = ($key === 'FLBuilder_lite') ? 'FLBuilder' : $key;
 
 						$this->integrations[$key] = 1;
 					}
 				}
 
 				// if BB, provide way to load a BB breakpoint set
-				if ( !empty($this->integrations['beaver_builder']) ){
+				if ( !empty($this->integrations['FLBuilder']) ){
 
 					$bb_global = get_option('_fl_builder_settings');
 					$small = !empty($bb_global->responsive_breakpoint)
@@ -1877,6 +2010,17 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 				}, $array);
 			}
 
+			function add_dyn_inline_css(){
+
+				if (!empty($this->preferences['mt_color_variables_css'])){
+
+				    $ruleSet = '.sp-container, .tvr-input-wrap { '.strip_tags($this->preferences['mt_color_variables_css']).' }';
+
+                    echo '<style id="mt_color_variables">'.$ruleSet.'</style>';
+				}
+
+            }
+
 			// add css
 			function add_css() {
 
@@ -1928,6 +2072,7 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 						}";
 					wp_add_inline_style( 'tvr_mcth_styles', $custom_css );
 				}
+
 			}
 
 			// build array for property/value input fields
@@ -2158,19 +2303,31 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 					
 
 					$this->propAliases = array(
-						'display-flex' => 'display',
-                        'display-grid' => 'display',
 
+					    'display-flex' => 'display',
+
+                        // properties that should go to grid prop in format cssf-grid
+                        'display-grid' => 'display',
                         'justify-items-grid' => 'justify-items',
                         'justify-content-grid' => 'justify-content',
-                        //'justify-self-grid' => 'justify-self', // use grid as default group for this
-
+						//'justify-self-grid' => 'justify-self', // use grid as default group for this
                         'align-items-grid' => 'align-items',
                         'align-content-grid' => 'align-content',
                         'align-self-grid' => 'align-self',
+						'order-grid' => 'order',
+						'z-index-grid' => 'z-index',
 
-                        'order-grid' => 'order',
-                        'z-index-grid' => 'z-index'
+						// caution order an z-index appear twice here!
+                        // this has implications for resolve_repeated_property_group (OK for now)
+
+						// properties that should go to grid all fields
+                        'width-gridall' => 'width',
+						'height-gridall' => 'height',
+						'grid-area-gridall' => 'grid-area',
+						'order-gridall' => 'order',
+						'z-index-gridall' => 'z-index',
+
+
                     );
 
 					// var for storing then writing json data to JS file
@@ -2194,13 +2351,15 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 					// also need to map subgroups to groups so pg_disabed[padding] will load group options
                     $sub_group_to_group = array();
 
-					// reference map/storage for style values from site's stylesheets e.g. color palette
+					// temporary reference map/storage for style values from site's stylesheets e.g. color palette
+                    // certain styles are saved to my_props
 					$gathered_css = array(
 						'eligable' => array(),
 						'store' => array(
 							//'site_colors' => array(),
 							//'saved_colors' => array(),
 						),
+						'root_cat_keys' => array(),
 					);
 
 					// combo array for storing data for comboboxes
@@ -2494,7 +2653,7 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 					//$data.= 'TvrMT.data.prog.grid_items = ' . json_encode($grid_items) . ';' . "\n\n";
 					$data.= 'TvrMT.data.prog.pg_tab_props = ' . json_encode($pg_tab_props) . ';' . "\n\n";
 					$data.= 'TvrMT.data.prog.pg_tab_map = ' . json_encode($pg_tab_map) . ';' . "\n\n";
-
+                    $data.= 'TvrMT.data.prog.params_to_strip = ' . json_encode($this->params_to_strip ) . ';' . "\n\n";
 
 					/***
 					 * HTML TEMPLATES
@@ -2547,6 +2706,8 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
                      'add_selector_form' => '',
 
                      'edit_selector_form' => '',
+
+                     'input_wraps' => $this->input_wrap_templates
 
 
                 );
@@ -4205,45 +4366,40 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 			// process preferences form
 			function process_preferences_form(){
 
-			    if (isset($_POST['tvr_preferences_form'])) {
+				$pref_array = $this->deep_unescape($_POST['tvr_preferences'], 0, 1, 1);
+				$pref_array['num_saves'] = ++$this->preferences['num_saves'];
 
-					check_admin_referer('tvr_preferences_submit');
+				// CSS units need saving in a different way (as my_props is more than just css units)
+				$pref_array = $this->update_default_css_units($pref_array);
 
-					$pref_array = $this->deep_unescape($_POST['tvr_preferences'], 0, 1, 1);
-					$pref_array['num_saves'] = ++$this->preferences['num_saves'];
+				// update g_url_with_subsets as manual subset param may have changed
+				$pref_array['g_url_with_subsets'] =
+					$this->g_url_with_subsets(false, false, $pref_array['gfont_subset']);
 
-					// CSS units need saving in a different way (as my_props is more than just css units)
-					$pref_array = $this->update_default_css_units($pref_array);
-
-					// update g_url_with_subsets as manual subset param may have changed
-					$pref_array['g_url_with_subsets'] =
-                        $this->g_url_with_subsets(false, false, $pref_array['gfont_subset']);
-
-					// if they changed !important or SCSS settings do full recompile
-                    if ($this->preference_settings_changed(['css_important', 'allow_scss', 'server_scss'],
-                        $this->preferences, $_POST['tvr_preferences'])){
-	                    $pref_array['manual_recompile_all_css'] = 1;
-                    }
-
-					if ($this->savePreferences($pref_array)) {
-
-                        $this->log(
-							esc_html__('Preferences saved', 'microthemer'),
-							'<p>' . esc_html__('Your Microthemer preferences have been successfully updated.', 'microthemer') . '</p>',
-							'notice'
-						);
-
-						// the admin bar shortcut needs to be applied here else it will only show on next page load
-						if (!empty($this->preferences['admin_bar_shortcut'])) {
-							add_action( 'admin_bar_menu', array(&$this, 'custom_toolbar_link'), 999999);
-						} else {
-							remove_action( 'admin_bar_menu', array(&$this, 'custom_toolbar_link'), 999999 );
-						}
-					}
-
-					// save last message in database so that it can be displayed on page reload (just once)
-					$this->cache_global_msg();
+				// if they changed !important or SCSS settings do full recompile
+				if ($this->preference_settings_changed(['css_important', 'allow_scss', 'server_scss'],
+					$this->preferences, $_POST['tvr_preferences'])){
+					$pref_array['manual_recompile_all_css'] = 1;
 				}
+
+				if ($this->savePreferences($pref_array)) {
+
+					$this->log(
+						esc_html__('Preferences saved', 'microthemer'),
+						'<p>' . esc_html__('Your Microthemer preferences have been successfully updated.', 'microthemer') . '</p>',
+						'notice'
+					);
+
+					// the admin bar shortcut needs to be applied here else it will only show on next page load
+					if (!empty($this->preferences['admin_bar_shortcut'])) {
+						add_action( 'admin_bar_menu', array(&$this, 'custom_toolbar_link'), 999999);
+					} else {
+						remove_action( 'admin_bar_menu', array(&$this, 'custom_toolbar_link'), 999999 );
+					}
+				}
+
+				// save last message in database so that it can be displayed on page reload (just once)
+				$this->cache_global_msg();
 			}
 
 			// update the preferences array with the new units when the user saves the preferences
@@ -4259,15 +4415,12 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 
 			// process posted zip file (do this on manage and single hence wrapped in a funciton )
 			function process_uploaded_zip() {
-				if (isset($_POST['tvr_upload_micro_submit'])) {
-					check_admin_referer('tvr_upload_micro_submit');
-					if ($_FILES['upload_micro']['error'] == 0) {
-						$this->handle_zip_package();
-					}
-					// there was an error - save in global message
-					else {
-						$this->log_file_upload_error($_FILES['upload_micro']['error']);
-					}
+				if ($_FILES['upload_micro']['error'] == 0) {
+					$this->handle_zip_package();
+				}
+				// there was an error - save in global message
+				else {
+					$this->log_file_upload_error($_FILES['upload_micro']['error']);
 				}
 			}
 
@@ -4284,1047 +4437,1172 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 				return strpos($this->site_url, 'livedemo.themeover') !== false;
 			}
 
+			// prevent errors when admin or frontend doesn't use SSL, but the other does
+			function ensure_iframe_protocol_matches_admin(){
+
+			    $preview_url = $this->preferences['preview_url'];
+				$preview_plain = strpos($preview_url,'http:') !== false;
+			    $admin_ssl = tvr_common::get_protocol() === 'https://';
+
+			    $update = false;
+
+                // SSL alteration
+			    if ($admin_ssl and $preview_plain){
+	                $preview_url = str_replace('http:', 'https:', $preview_url);
+	                $update = true;
+                }
+
+                // maybe strip Oxygen template URL
+
+
+                if ($update){
+	                $this->savePreferences(array('preview_url' => $preview_url));
+                }
+
+			}
+
 			// update the iframe preview url
 			function maybe_set_preview_url($nonce_key = false){
 
-			    if (isset($_GET['mt_preview_url'])) {
+				// update preview url in DB
+				$url = strip_tags(rawurldecode($_GET['mt_preview_url']));
 
-					// if we're on the demo site, skip nonce check but only allow page to be set, not arbitrary domain
-					$demo_site = $this->is_demo_site();
+				$pref_array['preview_url'] = tvr_common::strip_page_builder_and_other_params($url);
 
-					// the $nonce may be checked outside of this function, if not the key will be passed in
-					if ($nonce_key && !$demo_site) {
-						$nonce = $_REQUEST['_wpnonce'];
-						if ( ! wp_verify_nonce( $nonce, $nonce_key ) ) {
-							die( 'Security check failed' );
-						}
+				// path won't be set if this is triggered after user clicked WP Toolbar MT link
+				if (!empty($_GET['mt_preview_path'])){
+
+					// get path and strip builder and other params
+					$path = strip_tags(rawurldecode($_GET['mt_preview_path']));
+					$path = tvr_common::strip_page_builder_and_other_params($path);
+
+					//wp_die('$path: '.$_GET['mt_preview_path']);
+
+					$label = isset($_GET['mt_path_label'])
+						? strip_tags(rawurldecode($_GET['mt_path_label']))
+						: false;
+					$item_id = isset($_GET['mt_item_id'])
+						? strip_tags(rawurldecode($_GET['mt_item_id']))
+						: false;
+
+					// if the preview URL is 1, we should use the site_url with the path
+					// this is used on the live demo
+					if (intval($url) === 1){
+						$pref_array['preview_url'] = untrailingslashit($this->site_url).$path;
 					}
 
-					// update preview url in DB
-					$url = strip_tags(rawurldecode($_GET['mt_preview_url']));
-
-					//$this->show_me.= 'raw:' . $_GET['mt_preview_url'] . '<br />';
-					//$this->show_me.= 'rawurldecode:' . $url. '<br />';
-					$pref_array['preview_url'] = tvr_common::strip_page_builder_and_preview_params($url);
-
-					//$this->show_me.= 'page_builder:' . $url. '<br />';
-
-                    // ensure early auto-save draft have valid preview rather than 404
-                    // we don't actually need this as WP warns when clicking MT link if user hasn't saved draft
-                    /*if (isset($_GET['auto_save_draft'])){
-	                    //wp_die('<pre>'.print_r($_GET, true).'</pre>');
-                        wp_update_post(
-                            array(
-                                'ID' => intval($_GET['auto_save_draft']),
-                                'post_status' => 'draft'
-                            )
-                        );
-                    }*/
-
-					// path won't be set if this is triggered after user clicked WP Toolbar MT link
-					if (!empty($_GET['mt_preview_path'])){
-
-					    $path = strip_tags(rawurldecode($_GET['mt_preview_path']));
-
-						// if the preview URL is 1, we should use the site_url with the path
-                        // this is used on the live demo
-                        if (intval($url) === 1){
-	                        $pref_array['preview_url'] = untrailingslashit($this->site_url).$path;
-                        }
-
-						// insert new url at start of custom_paths array
-						if (!in_array($path, $this->preferences['custom_paths'])){
-							array_unshift($this->preferences['custom_paths'], $path);
-							// ensure only 20 items
-							$i = 0;
-							foreach ($this->preferences['custom_paths'] as $key => $path){
-								if (++$i > 20) break;
-								$pref_array['custom_paths'][] = $path;
-							}
-						}
+					// remove from array if already exists (as we be prepended at start)
+					$existingKey = $this->in_array_column($path, $this->preferences['custom_paths'], 'value');
+					if ($existingKey){
+						array_splice($this->preferences['custom_paths'], $existingKey,1);
 					}
 
-					$this->savePreferences($pref_array);
+					// insert url at start of custom_paths array
+					array_unshift($this->preferences['custom_paths'], array(
+						'value' => $path,
+						'label' => $label,
+						'item_id' => $item_id
+					));
+
+					// ensure only x items, and that paths are unique
+					$i = 0;
+					$paths_done = array();
+					foreach ($this->preferences['custom_paths'] as $key => $pathOrObj){
+
+						$custom_path = is_array($pathOrObj) ? $pathOrObj['value'] : $pathOrObj;
+
+						// add custom path if unique
+						if (empty($paths_done[$custom_path])){
+							$pref_array['custom_paths'][] = $pathOrObj;
+							$paths_done[$custom_path] = 1;
+							++$i;
+						}
+
+						if ($i >= 8) {
+							break;
+						}
+					}
 				}
+
+				$this->savePreferences($pref_array);
+
 			}
 
-			// Microthemer UI page
-			function microthemer_ui_page() {
+			// check an array based on nested property with option to search base array for value
+			function in_array_column($item, $array, $column = false, $checkFlat = false){
 
-				// only run code if it's the ui page
-				if ( isset($_GET['page']) and $_GET['page'] == $this->microthemeruipage ) {
+			    if ( $foundWithColumn = array_search( $item, array_column($array, $column) ) ){
+			        return $foundWithColumn;
+                }
 
-					// simple ajax operations that can be executed from any page, pointing to ui page
-					if (isset($_GET['mcth_simple_ajax'])) {
+			    if ($checkFlat){
+				    return array_search($item, $array);
+                }
 
-						// check ajax nonce
+			    return false;
+            }
+
+            function microthemer_ajax_actions(){
+
+	            if (!current_user_can('administrator')){
+		            wp_die('Access denied');
+	            }
+
+	            // simple ajax operations that can be executed from any page, pointing to ui page
+	            if (isset($_GET['mcth_simple_ajax'])) {
+
+		            check_ajax_referer( 'mcth_simple_ajax', '_wpnonce' );
+
+		            // workspace preferences
+		            if (isset($_POST['tvr_preferences_form'])) {
+			            $this->process_preferences_form();
+			            wp_die();
+		            }
+
+		            // if it's an options save request
+		            if (isset($_GET['mt_action']) and $_GET['mt_action'] == 'mt_save_interface') {
+
+			            // remove slashes and custom escaping so that DB data is clean
+			            $this->serialised_post =
+				            $this->deep_unescape($_POST, 1, 1, 1);
+
+			            if (!empty($this->serialised_post['serialise'])){
+				            $this->serialised_post['tvr_mcth'] = json_decode($this->serialised_post['tvr_mcth'], true);
+				            /*echo 'show_me from tvr_mcth: <pre> ';
+							print_r($_POST);
+							echo '</pre>';*/
+			            }
+
+			            // bail if no save data was successfully decoded
+			            if (empty($this->serialised_post['tvr_mcth'])) {
+				            return false;
+			            }
+
+			            // strange Kinsta error prompted this but might have been a fleeting issue
+			            $partial = !empty($this->serialised_post['partial_data'])
+				            ? $this->serialised_post['partial_data']
+				            : false;
+			            $last_save_time = !empty($this->serialised_post['last_save_time'])
+				            ? $this->serialised_post['last_save_time']
+				            : false;
 
 
-						// check ajax nonce, exception for preferences which has own nonce check (not just set via ajax)
-						if (!isset($_POST['tvr_preferences_form'])) {
-							check_ajax_referer( 'mcth_simple_ajax', '_wpnonce' );
-						}
-
-						// save general preferences - this is done else where
-						/*if (isset($_POST['tvr_preferences_form'])) {
-							$this->process_preferences_form();
-							wp_die();
+			            /*$debug = true;
+						if ($debug){
+							echo 'show_me from ajax save (before): <pre> ';
+							print_r($this->serialised_post);
+							echo '</pre>';
 						}*/
 
-						// if it's an options save request
-						if (isset($_GET['mt_action']) and $_GET['mt_action'] == 'mt_save_interface') {
+			            // save settings in DB
+			            if (!$this->saveUiOptions2(
+				            $this->serialised_post['tvr_mcth'],
+				            $partial,
+				            $last_save_time
+			            )) {
 
-							/*$circumvent_max_input_vars = true;
-							if ($circumvent_max_input_vars && !empty($_POST['serialise'])){
-								$this->my_parse_str($_POST['tvr_mcth'], $this->serialised_post);
-							} else {
-								//parse_str($_POST['tvr_serialized_data'], $this->serialised_post); // for debugging
-							}*/
+				            // save error
+				            $this->log(
+					            esc_html__('Settings failed to save', 'microthemer'),
+					            '<p>' . esc_html__('Saving your setting to the database failed.', 'microthemer') . '</p>'
+				            );
+			            }
 
-							// remove slashes and custom escaping so that DB data is clean
-							$this->serialised_post =
-								$this->deep_unescape($_POST, 1, 1, 1);
+			            // save successful
+			            else {
 
-							if (!empty($this->serialised_post['serialise'])){
-								$this->serialised_post['tvr_mcth'] = json_decode($this->serialised_post['tvr_mcth'], true);
-								/*echo 'show_me from tvr_mcth: <pre> ';
-								print_r($_POST);
-								echo '</pre>';*/
-							}
+				            $saveOk = esc_html__('Settings saved', 'microthemer');
+				            $this->log(
+					            $saveOk,
+					            '<p>' . esc_html__('The UI interface settings were successfully saved.', 'microthemer') . '</p>',
+					            'notice'
+				            );
 
-							/*$debug = true;
-							if ($debug){
-								echo 'show_me from ajax save (before): <pre> ';
-								print_r($this->serialised_post);
-								echo '</pre>';
-							}*/
+				            $new_select_option = '';
 
-							// save settings in DB
-							if (!$this->saveUiOptions2(
-							        $this->serialised_post['tvr_mcth'],
-                                    $this->serialised_post['partial_data'],
-                                    $this->serialised_post['last_save_time']
-                            )) {
+				            // check if settings need to be exported to a design pack
+				            if (!empty($this->serialised_post['export_to_pack'])
+				                && $this->serialised_post['export_to_pack'] == 1) {
+					            $theme = htmlentities($this->serialised_post['export_pack_name']);
+					            $context = 'existing';
+					            $do_option_insert = false;
+					            if ($this->serialised_post['new_pack'] == 1){
+						            $context = 'new';
+						            $do_option_insert = true;
+					            }
+					            // function return sanitised theme name
+					            $theme = $this->update_json_file($theme, $context);
+					            // save new sanitised theme in span for updating select menu via jQuery
+					            if ($do_option_insert) {
+						            $new_select_option = $theme;
+					            }
+					            //$user_action.= sprintf( esc_html__(' & Export to %s', 'microthemer'), '<i>'. $this->readable_name($theme). '</i>');
+				            }
 
-							    // save error
-							    $this->log(
-									esc_html__('Settings failed to save', 'microthemer'),
-									'<p>' . esc_html__('Saving your setting to the database failed.', 'microthemer') . '</p>'
-								);
-							}
+				            // else its a standard save of custom settings
+				            else {
+					            $theme = 'customised';
+					            //$user_action.= esc_html__(' (regular)', 'microthemer');
+				            }
 
-							// save successful
-							else {
-
-							    $saveOk = esc_html__('Settings saved', 'microthemer');
-								$this->log(
-									$saveOk,
-									'<p>' . esc_html__('The UI interface settings were successfully saved.', 'microthemer') . '</p>',
-									'notice'
-								);
-
-								$new_select_option = '';
-
-								// check if settings need to be exported to a design pack
-								if (!empty($this->serialised_post['export_to_pack'])
-                                    && $this->serialised_post['export_to_pack'] == 1) {
-									$theme = htmlentities($this->serialised_post['export_pack_name']);
-									$context = 'existing';
-									$do_option_insert = false;
-									if ($this->serialised_post['new_pack'] == 1){
-										$context = 'new';
-										$do_option_insert = true;
-									}
-									// function return sanitised theme name
-									$theme = $this->update_json_file($theme, $context);
-									// save new sanitised theme in span for updating select menu via jQuery
-									if ($do_option_insert) {
-										$new_select_option = $theme;
-									}
-									//$user_action.= sprintf( esc_html__(' & Export to %s', 'microthemer'), '<i>'. $this->readable_name($theme). '</i>');
-								}
-
-								// else its a standard save of custom settings
-								else {
-									$theme = 'customised';
-									//$user_action.= esc_html__(' (regular)', 'microthemer');
-								}
-
-								// update active-styles.css
-								$this->update_active_styles2($theme);
+				            // update active-styles.css
+				            $this->update_active_styles2($theme);
 
 
-								// update the revisions DB field
-								if (!$this->updateRevisions($this->options, json_encode($this->serialised_post['user_action']))) {
-									$this->log('','','error', 'revisions');
-								}
-							}
+				            // update the revisions DB field
+				            if (!$this->updateRevisions($this->options, json_encode($this->serialised_post['user_action']))) {
+					            $this->log('','','error', 'revisions');
+				            }
+			            }
 
 
 
-							//echo 'carrots!';
-							//wp_die();
+			            //echo 'carrots!';
+			            //wp_die();
 
-							// return the globalmessage and then kill the program - this action is always requested via ajax
-							// also fullUIData as an interim way to keep JS ui data up to date (post V5 will have new system with less http)
-							$html = '<div id="microthemer-notice">' . $this->display_log() . '<div class="script-feedback">
+			            // return the globalmessage and then kill the program - this action is always requested via ajax
+			            // also fullUIData as an interim way to keep JS ui data up to date (post V5 will have new system with less http)
+			            $html = '<div id="microthemer-notice">' . $this->display_log() . '<div class="script-feedback">
 								
 									<span id="outdated-tab-issue">'.$this->outdatedTabIssue.'</span>
 									<span id="returned-save-time">'.$this->options['non_section']['last_save_time'].'</span>
 								</div>
 							</div>';
 
-							// we're returning a JSON obejct here, the HTML is added as a property of the object
-							$response = array(
-								//'prefs' => $this->preferences,
-								'html'=> $html,
-								'outdatedTab'=> $this->outdatedTabIssue,
-								'outdatedTabDebug'=> $this->outdatedTabDebug,
-								'returnedSaveTime'=> $this->options['non_section']['last_save_time'],
-								'exportName' => $new_select_option
-								//'uiData'=> $this->options
-								//'uiData'=> array()
-							);
+			            // we're returning a JSON obejct here, the HTML is added as a property of the object
+			            $response = array(
+				            //'prefs' => $this->preferences,
+				            'html'=> $html,
+				            'outdatedTab'=> $this->outdatedTabIssue,
+				            'outdatedTabDebug'=> $this->outdatedTabDebug,
+				            'returnedSaveTime'=> $this->options['non_section']['last_save_time'],
+				            'exportName' => $new_select_option
+				            //'uiData'=> $this->options
+				            //'uiData'=> array()
+			            );
 
-							echo json_encode($response); //$html;
+			            echo json_encode($response); //$html;
 
-							wp_die();
+			            wp_die();
+		            }
+
+		            // if it's a silent save request for updating ui options (e.g. last viewed selector)
+		            if (isset($_GET['mt_action']) and $_GET['mt_action'] == 'mt_silent_save_interface') {
+			            $savePackage = $this->deep_unescape($_POST['savePackage'], 1, 1, 1);
+			            /*echo 'show_me from ajax save (before): <pre> ';
+						print_r($savePackage);
+						echo '</pre>';
+						return false;*/
+			            $this->apply_save_package($savePackage, $this->options);
+			            update_option($this->optionsName, $this->options);
+			            wp_die();
+		            }
+
+
+		            // $this->get_site_pages();
+		            if (isset($_GET['get_site_pages'])) {
+
+			            // MT posts search should only check title or slug so we get precise results (that appear in top 10 limit)
+			            // And because MT will filter out results with no title match on JS side anyway
+			            add_filter( 'posts_search', array(&$this, 'search_by_title_or_slug'), 10, 2 );
+
+			            $searchTerm = isset($_GET['search_term'])
+				            ? htmlentities($_GET['search_term'])
+				            : null;
+
+			            echo json_encode($this->get_site_pages($searchTerm));
+
+			            wp_die();
+		            }
+
+		            // ajax - load selectors and/or selector options
+		            /*if ( isset($_GET['mt_action']) and $_GET['mt_action'] == 'tvr_microthemer_ui_load_styles') {
+						//check_admin_referer('tvr_microthemer_ui_load_styles');
+						$section_name = strip_tags($_GET['tvr_load_section']);
+						$css_selector = strip_tags($_GET['tvr_load_selector']);
+						$array = $this->options[$section_name][$css_selector];
+						echo '<div id="tmp-wrap">';
+						echo $this->all_option_groups_html($section_name, $css_selector, $array);
+						echo '</div>';
+						// output pulled data to debug file
+						if ($this->debug_pulled_data){
+							$debug_file = $this->debug_dir . 'debug-pulled-data.txt';
+							$write_file = fopen($debug_file, 'w');
+							$data = '';
+							$data.= esc_html__('Custom debug output', 'microthemer') . "\n\n";
+							$data.= $this->debug_custom;
+							$data.= "\n\n" . esc_html__('Last pulled data', 'microthemer') . "\n\n";
+							$data.= print_r($this->options[$section_name][$css_selector], true);
+							fwrite($write_file, $data);
+							fclose($write_file);
+						}
+						// kill the program - this action is always requested via ajax. no message necessary
+						wp_die();
+					}*/
+
+		            // ajax - toggle draft mode
+		            if (isset($_GET['draft_mode'])) {
+
+			            $pref_array['draft_mode'] = intval($_GET['draft_mode']);
+
+			            // ned to get current user id again as $this->current_user_id won't be set in ajax request
+			            $current_user_id = get_current_user_id();
+
+			            // save current user in array
+			            if ($pref_array['draft_mode']){
+				            $pref_array['draft_mode_uids'][$current_user_id] = $current_user_id;
+			            } else {
+				            // reset if draft mode is off
+				            $pref_array['draft_mode_uids'] = array();
+			            }
+			            $this->savePreferences($pref_array);
+			            wp_die();
+		            }
+
+		            // selname_code_synced
+		            if (isset($_GET['load_sass_import'])) {
+
+			            $path = htmlentities(rawurldecode($_GET['load_sass_import']));
+			            $imports = $this->get_sass_import_paths('@import "'.$path.'";', '');
+			            $content = false;
+
+			            if ($imports){
+				            $content = $this->recursively_scan_import_files(
+					            array(
+						            'import' => $imports[0]
+					            )
+				            );
+			            }
+
+			            $response = array(
+				            'error' => !$content,
+				            'content' => $content
+			            );
+
+			            echo json_encode($response);
+			            wp_die();
+		            }
+
+		            // selname_code_synced
+		            if (isset($_GET['selname_code_synced'])) {
+			            $pref_array['selname_code_synced'] = intval($_GET['selname_code_synced']);
+			            $this->savePreferences($pref_array);
+			            wp_die();
+		            }
+
+		            // code_manual_resize
+		            if (isset($_GET['code_manual_resize'])) {
+			            $pref_array['code_manual_resize'] = intval($_GET['code_manual_resize']);
+			            $this->savePreferences($pref_array);
+			            wp_die();
+		            }
+
+		            // ace full page html
+		            if (isset($_GET['wizard_expanded'])) {
+			            $pref_array['wizard_expanded'] = intval($_GET['wizard_expanded']);
+			            $this->savePreferences($pref_array);
+			            wp_die();
+		            }
+
+		            // remember the state of the extra icons in the selectors menu
+		            if (isset($_GET['show_extra_actions'])) {
+			            $pref_array['show_extra_actions'] = intval($_GET['show_extra_actions']);
+			            $this->savePreferences($pref_array);
+			            wp_die();
+		            }
+
+		            // remember the grid highlight status
+		            if (isset($_GET['grid_highlight'])) {
+			            $pref_array['grid_highlight'] = intval($_GET['grid_highlight']);
+			            $this->savePreferences($pref_array);
+			            wp_die();
+		            }
+
+		            // remember show_sampled_values
+		            if (isset($_GET['show_sampled_values'])) {
+			            $pref_array['show_sampled_values'] = intval($_GET['show_sampled_values']);
+			            $this->savePreferences($pref_array);
+			            wp_die();
+		            }
+
+		            // remember show_sampled_variables
+		            if (isset($_GET['show_sampled_variables'])) {
+			            $pref_array['show_sampled_variables'] = intval($_GET['show_sampled_variables']);
+			            $this->savePreferences($pref_array);
+			            wp_die();
+		            }
+
+		            // mt_color_variables_css
+		            if (isset($_POST['mt_color_variables_css'])) {
+			            $pref_array['mt_color_variables_css'] = strip_tags($_POST['mt_color_variables_css']);
+			            $this->savePreferences($pref_array);
+			            wp_die();
+		            }
+
+		            // wizard footer/right dock
+		            if (isset($_GET['dock_wizard_right'])) {
+			            $pref_array['dock_wizard_right'] = intval($_GET['dock_wizard_right']);
+			            $this->savePreferences($pref_array);
+			            wp_die();
+		            }
+
+		            // instant hover inspection
+		            if (isset($_GET['hover_inspect'])) {
+			            $pref_array['hover_inspect'] = intval($_GET['hover_inspect']);
+			            $this->savePreferences($pref_array);
+			            wp_die();
+		            }
+
+		            // ajax - update preview url after page navigation
+		            if (isset($_GET['mt_preview_url'])) {
+			            $this->maybe_set_preview_url();
+			            // kill the program - this action is always requested via ajax. no message necessary
+			            wp_die();
+		            }
+
+		            // ajax - update preview url after page navigation
+		            if (isset($_GET['import_css_url'])) {
+			            // update view_import_stylesheets list with possible new stylesheet
+			            $this->update_css_import_urls(strip_tags(rawurldecode($_GET['import_css_url'])));
+			            wp_die();
+		            }
+
+		            // code editor focus
+		            if (isset($_GET['show_code_editor'])) {
+			            $pref_array = array();
+			            $pref_array['show_code_editor'] = intval($_GET['show_code_editor']);
+			            $this->savePreferences($pref_array);
+			            // kill the program - this action is always requested via ajax. no message necessary
+			            wp_die();
+		            }
+
+		            // ruler show/hide
+		            if (isset($_GET['show_rulers'])) {
+			            $pref_array = array();
+			            $pref_array['show_rulers'] = intval($_GET['show_rulers']);
+			            $this->savePreferences($pref_array);
+			            // kill the program - this action is always requested via ajax. no message necessary
+			            wp_die();
+		            }
+
+		            // specificity preference
+		            if (isset($_GET['specificity_preference'])) {
+			            $pref_array = array();
+			            $pref_array['specificity_preference'] = intval($_GET['specificity_preference']);
+			            $this->savePreferences($pref_array);
+			            // kill the program - this action is always requested via ajax. no message necessary
+			            wp_die();
+		            }
+
+		            // dock editor left
+		            if (isset($_GET['sidebar_size'])) {
+			            $pref_array = array();
+			            $pref_array['sidebar_size'] = intval($_GET['sidebar_size']);
+			            $pref_array['sidebar_size_category'] = htmlentities($_GET['sidebar_size']);
+			            $this->savePreferences($pref_array);
+			            // kill the program - this action is always requested via ajax. no message necessary
+			            wp_die();
+		            }
+
+		            // dock editor left
+		            if (isset($_GET['dock_editor_left'])) {
+			            $pref_array = array();
+			            $pref_array['dock_editor_left'] = intval($_GET['dock_editor_left']);
+			            $this->savePreferences($pref_array);
+			            // kill the program - this action is always requested via ajax. no message necessary
+			            wp_die();
+		            }
+
+		            // dock editor left
+		            if (isset($_GET['dock_options_left'])) {
+			            $pref_array = array();
+			            $pref_array['dock_options_left'] = intval($_GET['dock_options_left']);
+			            $this->savePreferences($pref_array);
+			            // kill the program - this action is always requested via ajax. no message necessary
+			            wp_die();
+		            }
+
+		            // detach preview -
+		            if (isset($_GET['detach_preview'])) {
+			            $pref_array = array();
+			            $pref_array['detach_preview'] = intval($_GET['detach_preview']);
+			            $this->savePreferences($pref_array);
+			            // kill the program - this action is always requested via ajax. no message necessary
+			            wp_die();
+		            }
+
+		            // ruler show/hide
+		            if (isset($_GET['show_text_labels'])) {
+			            $pref_array = array();
+			            $pref_array['show_text_labels'] = intval($_GET['show_text_labels']);
+			            $this->savePreferences($pref_array);
+			            wp_die();
+		            }
+
+		            // show/hide whole interface
+		            if (isset($_GET['show_interface'])) {
+			            $pref_array = array();
+			            $pref_array['show_interface'] = intval($_GET['show_interface']);
+			            $this->savePreferences($pref_array);
+			            // kill the program - this action is always requested via ajax. no message necessary
+			            wp_die();
+		            }
+
+		            // active MQ tab
+		            if (isset($_GET['manual_recompile_all_css'])) {
+			            $pref_array = array();
+			            $pref_array['manual_recompile_all_css'] = htmlentities($_GET['manual_recompile_all_css']);
+			            $this->savePreferences($pref_array);
+			            // kill the program - this action is always requested via ajax. no message necessary
+			            wp_die();
+		            }
+
+		            // active MQ tab
+		            if (isset($_GET['mq_device_focus'])) {
+			            $pref_array = array();
+			            $pref_array['mq_device_focus'] = htmlentities($_GET['mq_device_focus']);
+			            $this->savePreferences($pref_array);
+			            // kill the program - this action is always requested via ajax. no message necessary
+			            wp_die();
+		            }
+
+		            // active MQ tab
+		            if (isset($_GET['rev_save_status'])) {
+			            $this->updateRevisionSaveStatus(
+				            intval($_GET['rev_id']),
+				            intval($_GET['rev_save_status'])
+			            );
+			            wp_die();
+		            }
+
+		            // active CSS tab
+		            if (isset($_GET['css_focus'])) {
+			            $pref_array = array();
+			            $pref_array['css_focus'] = htmlentities($_GET['css_focus']);
+			            $this->savePreferences($pref_array);
+			            // kill the program - this action is always requested via ajax. no message necessary
+			            wp_die();
+		            }
+
+		            // update suggested values
+		            if (isset($_GET['update_sug_values'])) {
+
+			            $pref_array = array();
+			            $root_cat = $_GET['update_sug_values'];
+
+			            // tap into WordPress native JSON functions
+			            /*if( !class_exists('Moxiecode_JSON') ) {
+							require_once($this->thisplugindir . 'includes/class-json.php');
 						}
 
-						// if it's a silent save request for updating ui options (e.g. last viewed selector)
-						if (isset($_GET['mt_action']) and $_GET['mt_action'] == 'mt_silent_save_interface') {
-						    $savePackage = $this->deep_unescape($_POST['savePackage'], 1, 1, 1);
-							/*echo 'show_me from ajax save (before): <pre> ';
-							print_r($savePackage);
-							echo '</pre>';
-							return false;*/
-							$this->apply_save_package($savePackage, $this->options);
-							update_option($this->optionsName, $this->options);
-							wp_die();
+						$json_object = new Moxiecode_JSON();*/
+
+			            $data = json_decode( stripslashes($_POST['tvr_serialized_data']), true );
+
+			            // if we're setting suggested values for all properties
+			            if ($root_cat == 'all'){
+				            $this->preferences['my_props']['sug_values'] = $data['sug_values'];
+				            $this->preferences['my_props']['sug_variables'] = $data['sug_variables'];
+			            }  elseif ($root_cat == 'synced_set') {
+				            // a set of fields in one go e.g. padding
+				            $this->preferences['my_props']['sug_values'] =
+					            array_merge($this->preferences['my_props']['sug_values'], $data['synced_set']);
+			            } else {
+				            // just setting suggestions for a type of property e.g. site_colors
+
+				            if (!empty($data['specific'])){
+					            $this->preferences['my_props']['sug_values'][$root_cat] = $data['specific'];
+				            }
+			            }
+
+			            // update variable if passed
+			            if (!empty($data['sug_variables'])){
+				            $this->preferences['my_props']['sug_variables'] = $data['sug_variables'];
+				            $pref_array['default_sug_variables_set'] = 1;
+			            }
+
+			            $pref_array['default_sug_values_set'] = 1;
+			            $pref_array['my_props'] = $this->preferences['my_props'];
+			            $this->savePreferences($pref_array);
+
+			            //echo '<pre>posted array: '.print_r($data, true).'</pre>';
+
+			            // kill the program - this action is always requested via ajax. no message necessary
+			            wp_die();
+		            }
+
+		            // save google/typekit fonts config
+		            if (isset($_GET['save_font_config'])) {
+
+			            // tap into WordPress native JSON functions
+			            /*if( !class_exists('Moxiecode_JSON') ) {
+							require_once($this->thisplugindir . 'includes/class-json.php');
 						}
 
-						// ajax - load selectors and/or selector options
-						/*if ( isset($_GET['mt_action']) and $_GET['mt_action'] == 'tvr_microthemer_ui_load_styles') {
-							//check_admin_referer('tvr_microthemer_ui_load_styles');
-							$section_name = strip_tags($_GET['tvr_load_section']);
-							$css_selector = strip_tags($_GET['tvr_load_selector']);
-							$array = $this->options[$section_name][$css_selector];
-							echo '<div id="tmp-wrap">';
-							echo $this->all_option_groups_html($section_name, $css_selector, $array);
-							echo '</div>';
-							// output pulled data to debug file
-							if ($this->debug_pulled_data){
-								$debug_file = $this->debug_dir . 'debug-pulled-data.txt';
-								$write_file = fopen($debug_file, 'w');
-								$data = '';
-								$data.= esc_html__('Custom debug output', 'microthemer') . "\n\n";
-								$data.= $this->debug_custom;
-								$data.= "\n\n" . esc_html__('Last pulled data', 'microthemer') . "\n\n";
-								$data.= print_r($this->options[$section_name][$css_selector], true);
-								fwrite($write_file, $data);
-								fclose($write_file);
-							}
-							// kill the program - this action is always requested via ajax. no message necessary
-							wp_die();
-						}*/
+						$json_object = new Moxiecode_JSON();*/
 
-						// ajax - toggle draft mode
-						if (isset($_GET['draft_mode'])) {
+			            $data = json_decode( stripslashes($_POST['tvr_serialized_data']), true );
+			            $pref_array = array();
+			            $key = $_GET['save_font_config'] == 'google' ? 'google' : 'typekit';
+			            $pref_array['font_config'][$key] = $data;
 
-							$pref_array['draft_mode'] = intval($_GET['draft_mode']);
+			            $this->savePreferences($pref_array);
 
-							// ned to get current user id again as $this->current_user_id won't be set in ajax request
-							$current_user_id = get_current_user_id();
+			            //echo '<pre>posted array: '.print_r($data, true).'</pre>';
 
-							// save current user in array
-							if ($pref_array['draft_mode']){
-								$pref_array['draft_mode_uids'][$current_user_id] = $current_user_id;
-							} else {
-								// reset if draft mode is off
-								$pref_array['draft_mode_uids'] = array();
-							}
-							$this->savePreferences($pref_array);
-							wp_die();
-						}
+			            // kill the program - this action is always requested via ajax. no message necessary
+			            wp_die();
+		            }
 
-						// selname_code_synced
-						if (isset($_GET['load_sass_import'])) {
+		            // active property group
+		            if (isset($_GET['pg_focus'])) {
+			            $pref_array = array();
+			            $pref_array['pg_focus'] = htmlentities($_GET['pg_focus']);
+			            $this->savePreferences($pref_array);
+			            // kill the program - this action is always requested via ajax. no message necessary
+			            wp_die();
+		            }
 
-						    $path = htmlentities(rawurldecode($_GET['load_sass_import']));
-							$imports = $this->get_sass_import_paths('@import "'.$path.'";', '');
-							$content = false;
+		            // active generated_css_focus
+		            if (isset($_GET['generated_css_focus'])) {
+			            $pref_array = array();
+			            $pref_array['generated_css_focus'] = intval($_GET['generated_css_focus']);
+			            $this->savePreferences($pref_array);
+			            // kill the program - this action is always requested via ajax. no message necessary
+			            wp_die();
+		            }
 
-							if ($imports){
-								$content = $this->recursively_scan_import_files(
-									array(
-										'import' => $imports[0]
-									)
-								);
-                            }
+		            // remember selector wizard tab
+		            if (isset($_GET['adv_wizard_tab'])) {
+			            $pref_array = array();
+			            $pref_array['adv_wizard_tab'] = htmlentities($_GET['adv_wizard_tab']);
+			            $this->savePreferences($pref_array);
+			            // kill the program - this action is always requested via ajax. no message necessary
+			            wp_die();
+		            }
 
-							$response = array(
-							     'error' => !$content,
-							     'content' => $content
-							);
+		            // remember selector wizard tab
+		            if (isset($_GET['grid_focus'])) {
+			            $pref_array = array();
+			            $pref_array['grid_focus'] = htmlentities($_GET['grid_focus']);
+			            $this->savePreferences($pref_array);
+			            // kill the program - this action is always requested via ajax. no message necessary
+			            wp_die();
+		            }
 
-							echo json_encode($response);
-							wp_die();
-						}
+		            // last viewed selector
+		            /*if (isset($_GET['last_viewed_selector'])) {
+						$pref_array = array();
+						$pref_array['last_viewed_selector'] = htmlentities($_GET['last_viewed_selector']);
+						$this->savePreferences($pref_array);
+						// kill the program - this action is always requested via ajax. no message necessary
+						wp_die();
+					}*/
 
-						// selname_code_synced
-						if (isset($_GET['selname_code_synced'])) {
-							$pref_array['selname_code_synced'] = intval($_GET['selname_code_synced']);
-							$this->savePreferences($pref_array);
-							wp_die();
-						}
+		            // download pack
+		            if (!empty($_GET['mt_action']) and
+		                $_GET['mt_action'] == 'tvr_download_pack') {
+			            if (!empty($_GET['dir_name'])) {
+				            // first of all, copy any images from the media library
+				            $pack = $_GET['dir_name'];
+				            $dir = $this->micro_root_dir . $pack;
+				            $json_config_file = $dir . '/config.json';
+				            if ($library_images = $this->get_linked_library_images($json_config_file)){
+					            foreach($library_images as $key => $path){
+						            // strip site_url rather than home_url in this case coz using with ABSPATH
+						            $root_rel_path = $this->root_rel($path, false, true, true);
+						            $basename = basename($root_rel_path);
+						            $orig = rtrim(ABSPATH,"/"). $root_rel_path;
+						            $img_paths[] = $new = $dir . '/' . $basename;
+						            $replacements[$path] = $this->root_rel(
+							            $this->micro_root_url . $pack . '/' . $basename, false, true
+						            );
+						            if (!copy($orig, $new)){
+							            $this->log(
+								            esc_html__('Library image not downloaded', 'microthemer'),
+								            '<p>' . sprintf(esc_html__('%s could not be copied to the zip download file', 'microthemer'), $root_rel_path) . '</p>',
+								            'warning'
+							            );
+							            $download_status = 0;
+						            }
+					            }
+					            // cache original config file data
+					            $orig_json_data = $this->get_file_data($json_config_file);
 
-						// code_manual_resize
-						if (isset($_GET['code_manual_resize'])) {
-							$pref_array['code_manual_resize'] = intval($_GET['code_manual_resize']);
-							$this->savePreferences($pref_array);
-							wp_die();
-						}
+					            // update image paths in config.json for zip only (we'll restore shortly)
+					            $this->replace_json_paths($json_config_file, $replacements, $orig_json_data);
+				            }
 
-						// ace full page html
-						if (isset($_GET['wizard_expanded'])) {
-							$pref_array['wizard_expanded'] = intval($_GET['wizard_expanded']);
-							$this->savePreferences($pref_array);
-							wp_die();
-						}
-
-						// remember the state of the extra icons in the selectors menu
-						if (isset($_GET['show_extra_actions'])) {
-							$pref_array['show_extra_actions'] = intval($_GET['show_extra_actions']);
-							$this->savePreferences($pref_array);
-							wp_die();
-						}
-
-						// remember the grid highlight status
-						if (isset($_GET['grid_highlight'])) {
-							$pref_array['grid_highlight'] = intval($_GET['grid_highlight']);
-							$this->savePreferences($pref_array);
-							wp_die();
-						}
-
-
-						// wizard footer/right dock
-						if (isset($_GET['dock_wizard_right'])) {
-							$pref_array['dock_wizard_right'] = intval($_GET['dock_wizard_right']);
-							$this->savePreferences($pref_array);
-							wp_die();
-						}
-
-						// instant hover inspection
-						if (isset($_GET['hover_inspect'])) {
-							$pref_array['hover_inspect'] = intval($_GET['hover_inspect']);
-							$this->savePreferences($pref_array);
-							wp_die();
-						}
-
-						// ajax - update preview url after page navigation
-						if (isset($_GET['mt_preview_url'])) {
-							$this->maybe_set_preview_url();
-							// kill the program - this action is always requested via ajax. no message necessary
-							wp_die();
-						}
-
-						// ajax - update preview url after page navigation
-						if (isset($_GET['import_css_url'])) {
-							// update view_import_stylesheets list with possible new stylesheet
-							$this->update_css_import_urls(strip_tags(rawurldecode($_GET['import_css_url'])));
-							wp_die();
-						}
-
-						// code editor focus
-						if (isset($_GET['show_code_editor'])) {
-							$pref_array = array();
-							$pref_array['show_code_editor'] = intval($_GET['show_code_editor']);
-							$this->savePreferences($pref_array);
-							// kill the program - this action is always requested via ajax. no message necessary
-							wp_die();
-						}
-
-						// ruler show/hide
-						if (isset($_GET['show_rulers'])) {
-							$pref_array = array();
-							$pref_array['show_rulers'] = intval($_GET['show_rulers']);
-							$this->savePreferences($pref_array);
-							// kill the program - this action is always requested via ajax. no message necessary
-							wp_die();
-						}
-
-						// dock editor left
-						if (isset($_GET['sidebar_size'])) {
-							$pref_array = array();
-							$pref_array['sidebar_size'] = intval($_GET['sidebar_size']);
-							$pref_array['sidebar_size_category'] = htmlentities($_GET['sidebar_size']);
-							$this->savePreferences($pref_array);
-							// kill the program - this action is always requested via ajax. no message necessary
-							wp_die();
-						}
-
-						// dock editor left
-						if (isset($_GET['dock_editor_left'])) {
-							$pref_array = array();
-							$pref_array['dock_editor_left'] = intval($_GET['dock_editor_left']);
-							$this->savePreferences($pref_array);
-							// kill the program - this action is always requested via ajax. no message necessary
-							wp_die();
-						}
-
-						// dock editor left
-						if (isset($_GET['dock_options_left'])) {
-							$pref_array = array();
-							$pref_array['dock_options_left'] = intval($_GET['dock_options_left']);
-							$this->savePreferences($pref_array);
-							// kill the program - this action is always requested via ajax. no message necessary
-							wp_die();
-						}
-
-						// detach preview -
-						if (isset($_GET['detach_preview'])) {
-							$pref_array = array();
-							$pref_array['detach_preview'] = intval($_GET['detach_preview']);
-							$this->savePreferences($pref_array);
-							// kill the program - this action is always requested via ajax. no message necessary
-							wp_die();
-						}
-
-						// ruler show/hide
-						if (isset($_GET['show_text_labels'])) {
-							$pref_array = array();
-							$pref_array['show_text_labels'] = intval($_GET['show_text_labels']);
-							$this->savePreferences($pref_array);
-							wp_die();
-						}
-
-						// show/hide whole interface
-						if (isset($_GET['show_interface'])) {
-							$pref_array = array();
-							$pref_array['show_interface'] = intval($_GET['show_interface']);
-							$this->savePreferences($pref_array);
-							// kill the program - this action is always requested via ajax. no message necessary
-							wp_die();
-						}
-
-						// active MQ tab
-						if (isset($_GET['manual_recompile_all_css'])) {
-							$pref_array = array();
-							$pref_array['manual_recompile_all_css'] = htmlentities($_GET['manual_recompile_all_css']);
-							$this->savePreferences($pref_array);
-							// kill the program - this action is always requested via ajax. no message necessary
-							wp_die();
-						}
-
-						// active MQ tab
-						if (isset($_GET['mq_device_focus'])) {
-							$pref_array = array();
-							$pref_array['mq_device_focus'] = htmlentities($_GET['mq_device_focus']);
-							$this->savePreferences($pref_array);
-							// kill the program - this action is always requested via ajax. no message necessary
-							wp_die();
-						}
-
-						// active MQ tab
-						if (isset($_GET['rev_save_status'])) {
-							$this->updateRevisionSaveStatus(
-								intval($_GET['rev_id']),
-							    intval($_GET['rev_save_status'])
-                            );
-							wp_die();
-						}
-
-						// active CSS tab
-						if (isset($_GET['css_focus'])) {
-							$pref_array = array();
-							$pref_array['css_focus'] = htmlentities($_GET['css_focus']);
-							$this->savePreferences($pref_array);
-							// kill the program - this action is always requested via ajax. no message necessary
-							wp_die();
-						}
-
-						// update suggested values
-						if (isset($_GET['update_sug_values'])) {
-
-							$pref_array = array();
-							$root_cat = $_GET['update_sug_values'];
-
-							// tap into WordPress native JSON functions
-							/*if( !class_exists('Moxiecode_JSON') ) {
-								require_once($this->thisplugindir . 'includes/class-json.php');
-							}
-
-							$json_object = new Moxiecode_JSON();*/
-
-							$data = json_decode( stripslashes($_POST['tvr_serialized_data']), true );
-
-							// if we're setting suggested values for all properties
-							if ($root_cat == 'all'){
-								$this->preferences['my_props']['sug_values'] = $data;
-							} elseif ($root_cat == 'synced_set') {
-								// a set of fields in one go e.g. padding
-								$this->preferences['my_props']['sug_values'] =
-									array_merge($this->preferences['my_props']['sug_values'], $data);
-							} else {
-								// just setting suggestions for a type of property e.g. site_colors
-								$this->preferences['my_props']['sug_values'][$root_cat] = $data;
-							}
-
-							$pref_array['default_sug_values_set'] = 1;
-							$pref_array['my_props'] = $this->preferences['my_props'];
-							$this->savePreferences($pref_array);
-
-							//echo '<pre>posted array: '.print_r($data, true).'</pre>';
-
-							// kill the program - this action is always requested via ajax. no message necessary
-							wp_die();
-						}
-
-						// save google/typekit fonts config
-						if (isset($_GET['save_font_config'])) {
-
-							// tap into WordPress native JSON functions
-							/*if( !class_exists('Moxiecode_JSON') ) {
-								require_once($this->thisplugindir . 'includes/class-json.php');
-							}
-
-							$json_object = new Moxiecode_JSON();*/
-
-							$data = json_decode( stripslashes($_POST['tvr_serialized_data']), true );
-							$pref_array = array();
-							$key = $_GET['save_font_config'] == 'google' ? 'google' : 'typekit';
-							$pref_array['font_config'][$key] = $data;
-
-							$this->savePreferences($pref_array);
-
-							//echo '<pre>posted array: '.print_r($data, true).'</pre>';
-
-							// kill the program - this action is always requested via ajax. no message necessary
-							wp_die();
-						}
-
-						// active property group
-						if (isset($_GET['pg_focus'])) {
-							$pref_array = array();
-							$pref_array['pg_focus'] = htmlentities($_GET['pg_focus']);
-							$this->savePreferences($pref_array);
-							// kill the program - this action is always requested via ajax. no message necessary
-							wp_die();
-						}
-
-						// active generated_css_focus
-						if (isset($_GET['generated_css_focus'])) {
-							$pref_array = array();
-							$pref_array['generated_css_focus'] = intval($_GET['generated_css_focus']);
-							$this->savePreferences($pref_array);
-							// kill the program - this action is always requested via ajax. no message necessary
-							wp_die();
-						}
-
-						// remember selector wizard tab
-						if (isset($_GET['adv_wizard_tab'])) {
-							$pref_array = array();
-							$pref_array['adv_wizard_tab'] = htmlentities($_GET['adv_wizard_tab']);
-							$this->savePreferences($pref_array);
-							// kill the program - this action is always requested via ajax. no message necessary
-							wp_die();
-						}
-
-						// remember selector wizard tab
-						if (isset($_GET['grid_focus'])) {
-							$pref_array = array();
-							$pref_array['grid_focus'] = htmlentities($_GET['grid_focus']);
-							$this->savePreferences($pref_array);
-							// kill the program - this action is always requested via ajax. no message necessary
-							wp_die();
-						}
-
-						// last viewed selector
-						/*if (isset($_GET['last_viewed_selector'])) {
-							$pref_array = array();
-							$pref_array['last_viewed_selector'] = htmlentities($_GET['last_viewed_selector']);
-							$this->savePreferences($pref_array);
-							// kill the program - this action is always requested via ajax. no message necessary
-							wp_die();
-						}*/
-
-						// download pack
-						if (!empty($_GET['mt_action']) and
-						    $_GET['mt_action'] == 'tvr_download_pack') {
-							if (!empty($_GET['dir_name'])) {
-								// first of all, copy any images from the media library
-								$pack = $_GET['dir_name'];
-								$dir = $this->micro_root_dir . $pack;
-								$json_config_file = $dir . '/config.json';
-								if ($library_images = $this->get_linked_library_images($json_config_file)){
-									foreach($library_images as $key => $path){
-										// strip site_url rather than home_url in this case coz using with ABSPATH
-										$root_rel_path = $this->root_rel($path, false, true, true);
-										$basename = basename($root_rel_path);
-										$orig = rtrim(ABSPATH,"/"). $root_rel_path;
-										$img_paths[] = $new = $dir . '/' . $basename;
-										$replacements[$path] = $this->root_rel(
-											$this->micro_root_url . $pack . '/' . $basename, false, true
-										);
-										if (!copy($orig, $new)){
-											$this->log(
-												esc_html__('Library image not downloaded', 'microthemer'),
-												'<p>' . sprintf(esc_html__('%s could not be copied to the zip download file', 'microthemer'), $root_rel_path) . '</p>',
-												'warning'
-											);
-											$download_status = 0;
-										}
-									}
-									// cache original config file data
-									$orig_json_data = $this->get_file_data($json_config_file);
-
-									// update image paths in config.json for zip only (we'll restore shortly)
-									$this->replace_json_paths($json_config_file, $replacements, $orig_json_data);
-								}
-
-								// now zip the contents
-								if (
-								$this->create_zip(
-									$this->micro_root_dir,
-									$pack,
-									$this->thisplugindir.'zip-exports/')
-								){
-									$download_status = 1;
-								} else {
-									$download_status = 0;
-								}
-							}
-							else {
-								$download_status = 0;
-							}
-							// delete any media library images temporarily copied to the directory
-							if ($library_images){
-								// restore orgin config.json paths
-								$this->write_file($json_config_file, $orig_json_data);
-								// delete images
-								foreach ($img_paths as $key => $path){
-									if (!unlink($path)){
-										$this->log(
-											esc_html__('Temporary image could not be deleted.', 'microthemer'),
-											'<p>' . sprintf( esc_html__('%s was temporarily copied to your theme pack before download but could not be deleted after the download operation finished.', 'microthemer'), $this->root_rel($root_rel_path) ) . '</p>',
-											'warning'
-										);
-									}
-								}
-							}
-							echo '
+				            // now zip the contents
+				            if (
+				            $this->create_zip(
+					            $this->micro_root_dir,
+					            $pack,
+					            $this->thisplugindir.'zip-exports/')
+				            ){
+					            $download_status = 1;
+				            } else {
+					            $download_status = 0;
+				            }
+			            }
+			            else {
+				            $download_status = 0;
+			            }
+			            // delete any media library images temporarily copied to the directory
+			            if ($library_images){
+				            // restore orgin config.json paths
+				            $this->write_file($json_config_file, $orig_json_data);
+				            // delete images
+				            foreach ($img_paths as $key => $path){
+					            if (!unlink($path)){
+						            $this->log(
+							            esc_html__('Temporary image could not be deleted.', 'microthemer'),
+							            '<p>' . sprintf( esc_html__('%s was temporarily copied to your theme pack before download but could not be deleted after the download operation finished.', 'microthemer'), $this->root_rel($root_rel_path) ) . '</p>',
+							            'warning'
+						            );
+					            }
+				            }
+			            }
+			            echo '
 							<div id="microthemer-notice">'
-							     . $this->display_log() . '
+			                 . $this->display_log() . '
 								<span id="download-status" rel="'.$download_status.'"></span>
 							</div>';
-							wp_die();
-						}
+			            wp_die();
+		            }
 
-						// delete pack
-						if (!empty($_GET['mt_action']) and
-						    $_GET['mt_action'] == 'tvr_delete_micro_theme') {
-							if (!empty($_GET['dir_name']) and $this->tvr_delete_micro_theme($_GET['dir_name'])){
-								$delete_status = 1;
-							} else {
-								$delete_status = 0;
-							}
-							echo '
+		            // delete pack
+		            if (!empty($_GET['mt_action']) and
+		                $_GET['mt_action'] == 'tvr_delete_micro_theme') {
+			            if (!empty($_GET['dir_name']) and $this->tvr_delete_micro_theme($_GET['dir_name'])){
+				            $delete_status = 1;
+			            } else {
+				            $delete_status = 0;
+			            }
+			            echo '
 							<div id="microthemer-notice">'
-							     . $this->display_log() . '
+			                 . $this->display_log() . '
 								<span id="delete-status" rel="'.$delete_status.'"></span>
 							</div>';
-							wp_die();
-						}
+			            wp_die();
+		            }
 
-						// download remote css file
-						if (!empty($_GET['mt_action']) and
-						    $_GET['mt_action'] == 'tvr_get_remote_css') {
-							$config['allowed_ext'] = array('css');
-							$r = $this->get_safe_url(rawurldecode($_GET['url']), $config);
-							echo '
+		            // download remote css file
+		            if (!empty($_GET['mt_action']) and
+		                $_GET['mt_action'] == 'tvr_get_remote_css') {
+			            $config['allowed_ext'] = array('css');
+			            $r = $this->get_safe_url(rawurldecode($_GET['url']), $config);
+			            echo '
 							<div id="microthemer-notice">'
-							     . $this->display_log() . '
+			                 . $this->display_log() . '
 								<div id="remote-css">'.(!empty($r['content']) ? $r['content'] : 0).'</div>
 							</div>';
-							wp_die();
-						}
+			            wp_die();
+		            }
 
-						// if it's an import request
-						if ( !empty($_POST['import_pack_or_css']) ){
+		            // if it's an import request
+		            if ( !empty($_POST['import_pack_or_css']) ){
 
-							// if importing raw CSS
-							if (!empty($_POST['stylesheet_import_json'])){
+			            // if importing raw CSS
+			            if (!empty($_POST['stylesheet_import_json'])){
 
-								$context = esc_attr__('Raw CSS', 'microthemer');
-								$json_str = stripslashes($_POST['stylesheet_import_json']);
-								$p = $_POST['tvr_preferences'];
+				            $context = esc_attr__('Raw CSS', 'microthemer');
+				            $json_str = stripslashes($_POST['stylesheet_import_json']);
+				            $p = $_POST['tvr_preferences'];
 
-								// checkbox values must be explicitly evaluated
-								$p['css_imp_only_selected'] = !empty($p['css_imp_only_selected']) ? 1 : 0;
+				            // checkbox values must be explicitly evaluated
+				            $p['css_imp_only_selected'] = !empty($p['css_imp_only_selected']) ? 1 : 0;
 
-								// handle remote image import. See plugins that do this:
-								// https://premium.wpmudev.org/blog/download-remote-images-into-wordpress/
-								if (!empty($_POST['get_remote_images'])){
+				            // handle remote image import. See plugins that do this:
+				            // https://premium.wpmudev.org/blog/download-remote-images-into-wordpress/
+				            if (!empty($_POST['get_remote_images'])){
 
-									$r_images = explode('|', $_POST['get_remote_images']);
-									$do_copy = false;
-									$remote_images = array();
-									$all_r = array();
-									foreach ($r_images as $i => $both){
-										$tmp = explode(',', $both);
-										$path_in_data = $tmp[0];
-										$full_url = $tmp[1];
-										// save to temp dir first
-										$r = $this->get_safe_url($full_url, array(
-											'allowed_ext' => array('jpg', 'jpeg', 'gif', 'png', 'svg'),
-											'tmp_file' => 1
-										));
+					            $r_images = explode('|', $_POST['get_remote_images']);
+					            $do_copy = false;
+					            $remote_images = array();
+					            $all_r = array();
+					            foreach ($r_images as $i => $both){
+						            $tmp = explode(',', $both);
+						            $path_in_data = $tmp[0];
+						            $full_url = $tmp[1];
+						            // save to temp dir first
+						            $r = $this->get_safe_url($full_url, array(
+							            'allowed_ext' => array('jpg', 'jpeg', 'gif', 'png', 'svg'),
+							            'tmp_file' => 1
+						            ));
 
-										if ($r){
-											$remote_images[$path_in_data] = $r['tmp_file'];
-											$do_copy = true;
-											//$all_r[++$i] = $r;
-										}
+						            if ($r){
+							            $remote_images[$path_in_data] = $r['tmp_file'];
+							            $do_copy = true;
+							            //$all_r[++$i] = $r;
+						            }
 
-									}
+					            }
 
-									// do image copy function
-									if ($do_copy){
+					            // do image copy function
+					            if ($do_copy){
 
-										$updated_json_str = $this->import_pack_images_to_library(
-											false,
-											'custom',
-											$json_str,
-											$remote_images
-										);
+						            $updated_json_str = $this->import_pack_images_to_library(
+							            false,
+							            'custom',
+							            $json_str,
+							            $remote_images
+						            );
 
-										$json_str = $updated_json_str ? $updated_json_str : $json_str;
-									}
+						            $json_str = $updated_json_str ? $updated_json_str : $json_str;
+					            }
 
-								}
+				            }
 
-								// load the json file
-								$this->load_json_file(false, 'custom', $context, $json_str);
+				            // load the json file
+				            $this->load_json_file(false, 'custom', $context, $json_str);
 
-								// save the import preferences
-								$this->savePreferences($p);
-							}
+				            // save the import preferences
+				            $this->savePreferences($p);
+			            }
 
-							// if importing an MT design pack
-							else {
-
-
-								$theme_name = sanitize_file_name(sanitize_title(htmlentities($_POST['import_from_pack_name'])));
+			            // if importing an MT design pack
+			            else {
 
 
-								$json_file = $this->micro_root_dir . $theme_name . '/config.json';
-
-								$context = $_POST['tvr_import_method'];
-
-								// import any background images that may need moving to the media library and update json
-								$this->import_pack_images_to_library($json_file, $theme_name);
-
-								// load the json file
-								$this->load_json_file($json_file, $theme_name, $context);
-
-							}
-
-							// signal that all selectors should be recompiled (to ensure latest data structure)
-							$this->update_preference('manual_recompile_all_css', 1);
-
-							// update the revisions DB field
-							if (!$this->updateRevisions($this->options, $this->json_format_ua(
-								'import-from-pack lg-icon',
-								esc_html__('Import', 'microthemer') . ' ('.$context.'):&nbsp;',
-								$this->readable_name($theme_name)
-							))) {
-								$this->log('','','error', 'revisions');
-							}
-
-							// save last message in database so that it can be displayed on page reload (just once)
-							$this->cache_global_msg();
-							wp_die();
-						}
+				            $theme_name = sanitize_file_name(sanitize_title(htmlentities($_POST['import_from_pack_name'])));
 
 
+				            $json_file = $this->micro_root_dir . $theme_name . '/config.json';
 
-						// if it's a reset request
-                        elseif( isset($_GET['mt_action']) and $_GET['mt_action'] == 'tvr_ui_reset'){
-							if ($this->resetUiOptions()) {
-								$this->update_active_styles2('customised');
-								$item = esc_html__('Folders were reset', 'microthemer');
-								$this->log(
-									$item,
-									'<p>' . esc_html__('The default empty folders have been reset.', 'microthemer') . '</p>',
-									'notice'
-								);
-								// update the revisions DB field
-								if (!$this->updateRevisions($this->options, $this->json_format_ua(
-									'folder-reset lg-icon',
-									$item
-								))) {
-									$this->log(
-										esc_html__('Revision failed to save', 'microthemer'),
-										'<p>' . esc_html__('The revisions table could not be updated.', 'microthemer') . '</p>',
-										'notice'
-									);
-								}
-							}
-							// save last message in database so that it can be displayed on page reload (just once)
-							$this->cache_global_msg();
-							wp_die();
-						}
+				            $context = $_POST['tvr_import_method'];
 
-						// if it's a clear styles request
-                        elseif(isset($_GET['mt_action']) and $_GET['mt_action'] == 'tvr_clear_styles'){
-							if ($this->clearUiOptions()) {
-								$this->update_active_styles2('customised');
-								$item = esc_html__('Styles were cleared', 'microthemer');
-								$this->log(
-									$item,
-									'<p>' . esc_html__('All styles were cleared, but your folders and selectors remain fully intact.', 'microthemer') . '</p>',
-									'notice'
-								);
-								// update the revisions DB field
-								if (!$this->updateRevisions($this->options, $item)) {
-									$this->log('', '', 'error', 'revisions');
-								}
-							}
-							// save last message in database so that it can be displayed on page reload (just once)
-							$this->cache_global_msg();
-							wp_die();
-						}
+				            // import any background images that may need moving to the media library and update json
+				            $this->import_pack_images_to_library($json_file, $theme_name);
 
-						// if it's an email error report request
-                        elseif(isset($_GET['mt_action']) and $_GET['mt_action'] == 'tvr_error_email'){
-							$body = "*** MICROTHEMER ERROR REPORT | ".date('d/m/Y h:i:s a', $this->time)." *** \n\n";
-							$body .= "PHP ERROR \n" . stripslashes($_POST['tvr_php_error']) . "\n\n";
-							$body .= "BROWSER INFO \n" . stripslashes($_POST['tvr_browser_info']) . "\n\n";
-							$body .= "SERIALISED POSTED DATA \n" . stripslashes($_POST['tvr_serialised_data']) . "\n\n";
-							// An error can occur EITHER when saving to DB OR creating the active-styles.css
-							// The php error line number will reveal this. If the latter is true, the DB data contains the posted data too (FYI)
-							$body .= "SERIALISED DATA IN DB \n" . serialize($this->options). "\n\n";
-							// write file to error-reports dir
-							$file_path = 'error-reports/error-'.date('Y-m-d').'.txt';
-							$error_file = $this->thisplugindir . $file_path;
-							$write_file = fopen($error_file, 'w');
-							fwrite($write_file, $body);
-							fclose($write_file);
-							// Determine from email address. Try to use validated customer email. Don't contact if not Microthemer customer.
-							if ( !empty($this->preferences['buyer_email']) ) {
-								$from_email = $this->preferences['buyer_email'];
-								$body .= "MICROTHEMER CUSTOMER EMAIL \n" . $from_email;
-							}
-							else {
-								$from_email = get_option('admin_email');
-							}
-							// Try to send email (won't work on localhost)
-							$subject = 'Microthemer Error Report | ' . date('d/m/Y', $this->time);
-							$to = 'support@themeover.com';
-							$from = "Microthemer User <$from_email>";
-							$headers = "From: $from";
-							if(@mail($to,$subject,$body,$headers)) {
-								$this->log(
-									esc_html__('Email successfully sent', 'microthemer'),
-									'<p>' . esc_html__('Your error report was successfully emailed to Themeover. Thanks, this really does help.', 'microthemer') . '</p>',
-									'notice'
-								);
-							}
-							else {
-								$error_url = $this->thispluginurl . $file_path;
-								$this->log(
-									esc_html__('Report email failed', 'microthemer'),
-									'<p>' . esc_html__('Your error report email failed to send (are you on localhost?)', 'microthemer') . '</p>
+				            // load the json file
+				            $this->load_json_file($json_file, $theme_name, $context);
+
+			            }
+
+			            // signal that all selectors should be recompiled (to ensure latest data structure)
+			            $this->update_preference('manual_recompile_all_css', 1);
+
+			            // update the revisions DB field
+			            if (!$this->updateRevisions($this->options, $this->json_format_ua(
+				            'import-from-pack lg-icon',
+				            esc_html__('Import', 'microthemer') . ' ('.$context.'):&nbsp;',
+				            $this->readable_name($theme_name)
+			            ))) {
+				            $this->log('','','error', 'revisions');
+			            }
+
+			            // save last message in database so that it can be displayed on page reload (just once)
+			            $this->cache_global_msg();
+			            wp_die();
+		            }
+
+
+
+		            // if it's a reset request
+                    elseif( isset($_GET['mt_action']) and $_GET['mt_action'] == 'tvr_ui_reset'){
+			            if ($this->resetUiOptions()) {
+				            $this->update_active_styles2('customised');
+				            $item = esc_html__('Folders were reset', 'microthemer');
+				            $this->log(
+					            $item,
+					            '<p>' . esc_html__('The default empty folders have been reset.', 'microthemer') . '</p>',
+					            'notice'
+				            );
+				            // update the revisions DB field
+				            if (!$this->updateRevisions($this->options, $this->json_format_ua(
+					            'folder-reset lg-icon',
+					            $item
+				            ))) {
+					            $this->log(
+						            esc_html__('Revision failed to save', 'microthemer'),
+						            '<p>' . esc_html__('The revisions table could not be updated.', 'microthemer') . '</p>',
+						            'notice'
+					            );
+				            }
+			            }
+			            // save last message in database so that it can be displayed on page reload (just once)
+			            $this->cache_global_msg();
+			            wp_die();
+		            }
+
+		            // if it's a clear styles request
+                    elseif(isset($_GET['mt_action']) and $_GET['mt_action'] == 'tvr_clear_styles'){
+			            if ($this->clearUiOptions()) {
+				            $this->update_active_styles2('customised');
+				            $item = esc_html__('Styles were cleared', 'microthemer');
+				            $this->log(
+					            $item,
+					            '<p>' . esc_html__('All styles were cleared, but your folders and selectors remain fully intact.', 'microthemer') . '</p>',
+					            'notice'
+				            );
+				            // update the revisions DB field
+				            if (!$this->updateRevisions($this->options, $item)) {
+					            $this->log('', '', 'error', 'revisions');
+				            }
+			            }
+			            // save last message in database so that it can be displayed on page reload (just once)
+			            $this->cache_global_msg();
+			            wp_die();
+		            }
+
+		            // if it's an email error report request
+                    elseif(isset($_GET['mt_action']) and $_GET['mt_action'] == 'tvr_error_email'){
+			            $body = "*** MICROTHEMER ERROR REPORT | ".date('d/m/Y h:i:s a', $this->time)." *** \n\n";
+			            $body .= "PHP ERROR \n" . stripslashes($_POST['tvr_php_error']) . "\n\n";
+			            $body .= "BROWSER INFO \n" . stripslashes($_POST['tvr_browser_info']) . "\n\n";
+			            $body .= "SERIALISED POSTED DATA \n" . stripslashes($_POST['tvr_serialised_data']) . "\n\n";
+			            // An error can occur EITHER when saving to DB OR creating the active-styles.css
+			            // The php error line number will reveal this. If the latter is true, the DB data contains the posted data too (FYI)
+			            $body .= "SERIALISED DATA IN DB \n" . serialize($this->options). "\n\n";
+			            // write file to error-reports dir
+			            $file_path = 'error-reports/error-'.date('Y-m-d').'.txt';
+			            $error_file = $this->thisplugindir . $file_path;
+			            $write_file = fopen($error_file, 'w');
+			            fwrite($write_file, $body);
+			            fclose($write_file);
+			            // Determine from email address. Try to use validated customer email. Don't contact if not Microthemer customer.
+			            if ( !empty($this->preferences['buyer_email']) ) {
+				            $from_email = $this->preferences['buyer_email'];
+				            $body .= "MICROTHEMER CUSTOMER EMAIL \n" . $from_email;
+			            }
+			            else {
+				            $from_email = get_option('admin_email');
+			            }
+			            // Try to send email (won't work on localhost)
+			            $subject = 'Microthemer Error Report | ' . date('d/m/Y', $this->time);
+			            $to = 'support@themeover.com';
+			            $from = "Microthemer User <$from_email>";
+			            $headers = "From: $from";
+			            if(@mail($to,$subject,$body,$headers)) {
+				            $this->log(
+					            esc_html__('Email successfully sent', 'microthemer'),
+					            '<p>' . esc_html__('Your error report was successfully emailed to Themeover. Thanks, this really does help.', 'microthemer') . '</p>',
+					            'notice'
+				            );
+			            }
+			            else {
+				            $error_url = $this->thispluginurl . $file_path;
+				            $this->log(
+					            esc_html__('Report email failed', 'microthemer'),
+					            '<p>' . esc_html__('Your error report email failed to send (are you on localhost?)', 'microthemer') . '</p>
 								<p>' .
-									wp_kses(
-										sprintf(
-											__('Please email <a %1$s>this report</a> to %2$s', 'microthemer'),
-											'target="_blank" href="' .$error_url . '"',
-											'<a href="mailto:support@themeover.com">support@themeover.com</a>'
-										),
-										array( 'a' => array( 'href' => array(), 'target' => array() ) )
-									)
-									. '</p>'
-								);
-							}
-							echo '
+					            wp_kses(
+						            sprintf(
+							            __('Please email <a %1$s>this report</a> to %2$s', 'microthemer'),
+							            'target="_blank" href="' .$error_url . '"',
+							            '<a href="mailto:support@themeover.com">support@themeover.com</a>'
+						            ),
+						            array( 'a' => array( 'href' => array(), 'target' => array() ) )
+					            )
+					            . '</p>'
+				            );
+			            }
+			            echo '
 						<div id="microthemer-notice">'. $this->display_log() . '</div>';
-							wp_die();
-						}
+			            wp_die();
+		            }
 
-						// if it's a restore revision request
-						if(isset($_GET['mt_action']) and $_GET['mt_action'] == 'restore_rev'){
-							$rev_key = $_GET['tvr_rev'];
-							if ($this->restoreRevision($rev_key)) {
-								$item = esc_html__('Previous settings restored', 'microthemer');
-								$this->log(
-									$item,
-									'<p>' . esc_html__('Your settings were successfully restored from a previous save.', 'microthemer') . '</p>',
-									'notice'
-								);
-								$this->update_active_styles2('customised');
-								// update the revisions DB field
-								if (!$this->updateRevisions($this->options, $this->json_format_ua(
-									'display-revisions lg-icon',
-									$item
-								))) {
-									$this->log('','','error', 'revisions');
-								}
-							}
-							else {
-								$this->log(
-									esc_html__('Settings restore failed', 'microthemer'),
-									'<p>' . esc_html__('Data could not be restored from a previous save.', 'microthemer') . '</p>'
-								);
-							}
-							// save last message in database so that it can be displayed on page reload (just once)
-							$this->cache_global_msg();
-							wp_die();
-						}
+		            // if it's a restore revision request
+		            if(isset($_GET['mt_action']) and $_GET['mt_action'] == 'restore_rev'){
+			            $rev_key = $_GET['tvr_rev'];
+			            if ($this->restoreRevision($rev_key)) {
+				            $item = esc_html__('Previous settings restored', 'microthemer');
+				            $this->log(
+					            $item,
+					            '<p>' . esc_html__('Your settings were successfully restored from a previous save.', 'microthemer') . '</p>',
+					            'notice'
+				            );
+				            $this->update_active_styles2('customised');
+				            // update the revisions DB field
+				            if (!$this->updateRevisions($this->options, $this->json_format_ua(
+					            'display-revisions lg-icon',
+					            $item
+				            ))) {
+					            $this->log('','','error', 'revisions');
+				            }
+			            }
+			            else {
+				            $this->log(
+					            esc_html__('Settings restore failed', 'microthemer'),
+					            '<p>' . esc_html__('Data could not be restored from a previous save.', 'microthemer') . '</p>'
+				            );
+			            }
+			            // save last message in database so that it can be displayed on page reload (just once)
+			            $this->cache_global_msg();
+			            wp_die();
+		            }
 
-						// if it's a get revision ajax request
-                        elseif(isset($_GET['mt_action']) and $_GET['mt_action'] == 'get_revisions'){
-							echo '<div id="tmp-wrap">' . $this->getRevisions() . '</div>'; // outputs table
-							wp_die();
-						}
-
-
-						/* PREFERENCES FUNCTIONS MOVED TO MAIN UI */
-
-						// update the MQs
-						if (isset($_POST['tvr_media_queries_submit'])){
-
-						    $orig_media_queries = $this->preferences['m_queries'];
-
-							// remove backslashes from $_POST
-							$_POST = $this->deep_unescape($_POST, 0, 1, 1);
-							// get the initial scale and default width for the "All Devices" tab
-							$pref_array['initial_scale'] = $_POST['tvr_preferences']['initial_scale'];
-							$pref_array['all_devices_default_width'] = $_POST['tvr_preferences']['all_devices_default_width'];
-							// reset default media queries if all empty
-							$action = '';
-							if (empty($_POST['tvr_preferences']['m_queries'])) {
-								$pref_array['m_queries'] = $this->default_m_queries;
-								$action = 'reset';
-							} else {
-								$pref_array['m_queries'] = $_POST['tvr_preferences']['m_queries'];
-								$action = 'update';
-							}
-
-							// are we merging/overwriting with a new media query set
-							if (!empty($_POST['tvr_preferences']['load_mq_set'])){
-								//print_r($this->mq_sets);
-								$action = 'load_set';
-								$new_set = $_POST['tvr_preferences']['load_mq_set'];
-								$new_mq_set = $this->mq_sets[$new_set];
-								$pref_array['overwrite_existing_mqs'] = $_POST['tvr_preferences']['overwrite_existing_mqs'];
-								if (!empty($pref_array['overwrite_existing_mqs'])){
-									$pref_array['m_queries'] = $new_mq_set;
-									$load_action = esc_html__('replaced', 'microthemer');
-								} else {
-									$pref_array['m_queries'] = array_merge($pref_array['m_queries'], $new_mq_set);
-									$load_action = esc_html__('was merged with', 'microthemer');
-								}
-							}
-
-							// format media query min/max width (height later) and units
-							$pref_array['m_queries'] = $this->mq_min_max($pref_array);
-
-							// save and preset message
-							$pref_array['num_saves'] = ++$this->preferences['num_saves'];
-
-							if ($this->savePreferences($pref_array)) {
-
-								switch ($action) {
-									case 'reset':
-										$this->log(
-											esc_html__('Media queries were reset', 'microthemer'),
-											'<p>' . esc_html__('The default media queries were successfully reset.', 'microthemer') . '</p>',
-											'notice'
-										);
-										break;
-									case 'update':
-										$this->log(
-											esc_html__('Media queries were updated', 'microthemer'),
-											'<p>' . esc_html__('Your media queries were successfully updated.', 'microthemer') . '</p>',
-											'notice'
-										);
-										break;
-									case 'load_set':
-										$this->log(
-											esc_html__('Media query set loaded', 'microthemer'),
-											'<p>' . sprintf( esc_html__('A new media query set %1$s your existing media queries: %2$s', 'microthemer'), $load_action, htmlentities($_POST['tvr_preferences']['load_mq_set']) ) . '</p>',
-											'notice'
-										);
-										break;
-								}
-
-								// if the user deleted a media query, ensure data is cleaned from the ui data
-                                $this->clean_deleted_media_queries($orig_media_queries, $pref_array['m_queries']);
-
-							}
-							// save last message in database so that it can be displayed on page reload (just once)
-							$this->cache_global_msg();
-							wp_die();
-						}
-
-						// update the enqueued JS files
-						if (isset($_POST['mt_enqueue_js_submit'])){
-							// remove backslashes from $_POST
-							$_POST = $this->deep_unescape($_POST, 0, 1, 1);
-							$pref_array['enq_js'] = $_POST['tvr_preferences']['enq_js'];
-							$pref_array['num_saves'] = ++$this->preferences['num_saves'];
-							// save and present message
-							if ($this->savePreferences($pref_array)) {
-								$this->log(
-									esc_html__('Enqueued scripts were updated', 'microthemer'),
-									'<p>' . esc_html__('Your enqueued scripts were successfully updated.', 'microthemer') . '</p>',
-									'notice'
-								);
-							}
-
-							// save last message in database so that it can be displayed on page reload (just once)
-							$this->cache_global_msg();
-							wp_die();
-						}
-
-						// reset default preferences
-						if (isset($_POST['tvr_preferences_reset'])) {
-							check_admin_referer('tvr_preferences_reset');
-							$pref_array = $this->default_preferences;
-							if ($this->savePreferences($pref_array)) {
-								$this->log(
-									esc_html__('Preferences were reset', 'microthemer'),
-									'<p>' . esc_html__('The default program preferences were reset.', 'microthemer') . '</p>',
-									'notice'
-								);
-							}
-						}
+		            // if it's a get revision ajax request
+                    elseif(isset($_GET['mt_action']) and $_GET['mt_action'] == 'get_revisions'){
+			            echo '<div id="tmp-wrap">' . $this->getRevisions() . '</div>'; // outputs table
+			            wp_die();
+		            }
 
 
-						// css filter configs
-						$filter_types = array('page_specific', 'pseudo_classes', 'pseudo_elements', 'favourite_filter');
-						foreach ($filter_types as $type){
-							if (isset($_GET[$type])) {
-								$this->preferences[$type][$_GET['pref_sub_key']] = intval($_GET[$type]);
-								$pref_array[$type] = $this->preferences[$type];
-								$this->savePreferences( $pref_array );
-								//echo '<pre>'. print_r($this->preferences[$type], true).'</pre>';
-								wp_die();
-							}
-						}
+		            /* PREFERENCES FUNCTIONS MOVED TO MAIN UI */
 
-						// if we got to hear, the ajax request didn't work as intended, so warn
-						echo 'Yo! The Ajax call failed to trigger any function. Sort it out.';
-						wp_die();
+		            // update the MQs
+		            if (isset($_POST['tvr_media_queries_submit'])){
 
+			            $orig_media_queries = $this->preferences['m_queries'];
+
+			            // remove backslashes from $_POST
+			            $_POST = $this->deep_unescape($_POST, 0, 1, 1);
+			            // get the initial scale and default width for the "All Devices" tab
+			            $pref_array['initial_scale'] = $_POST['tvr_preferences']['initial_scale'];
+			            $pref_array['all_devices_default_width'] = $_POST['tvr_preferences']['all_devices_default_width'];
+			            // reset default media queries if all empty
+			            $action = '';
+			            if (empty($_POST['tvr_preferences']['m_queries'])) {
+				            $pref_array['m_queries'] = $this->default_m_queries;
+				            $action = 'reset';
+			            } else {
+				            $pref_array['m_queries'] = $_POST['tvr_preferences']['m_queries'];
+				            $action = 'update';
+			            }
+
+			            // are we merging/overwriting with a new media query set
+			            if (!empty($_POST['tvr_preferences']['load_mq_set'])){
+				            //print_r($this->mq_sets);
+				            $action = 'load_set';
+				            $new_set = $_POST['tvr_preferences']['load_mq_set'];
+				            $new_mq_set = $this->mq_sets[$new_set];
+				            $pref_array['overwrite_existing_mqs'] = $_POST['tvr_preferences']['overwrite_existing_mqs'];
+				            if (!empty($pref_array['overwrite_existing_mqs'])){
+					            $pref_array['m_queries'] = $new_mq_set;
+					            $load_action = esc_html__('replaced', 'microthemer');
+				            } else {
+					            $pref_array['m_queries'] = array_merge($pref_array['m_queries'], $new_mq_set);
+					            $load_action = esc_html__('was merged with', 'microthemer');
+				            }
+			            }
+
+			            // format media query min/max width (height later) and units
+			            $pref_array['m_queries'] = $this->mq_min_max($pref_array);
+
+			            // save and preset message
+			            $pref_array['num_saves'] = ++$this->preferences['num_saves'];
+
+			            if ($this->savePreferences($pref_array)) {
+
+				            switch ($action) {
+					            case 'reset':
+						            $this->log(
+							            esc_html__('Media queries were reset', 'microthemer'),
+							            '<p>' . esc_html__('The default media queries were successfully reset.', 'microthemer') . '</p>',
+							            'notice'
+						            );
+						            break;
+					            case 'update':
+						            $this->log(
+							            esc_html__('Media queries were updated', 'microthemer'),
+							            '<p>' . esc_html__('Your media queries were successfully updated.', 'microthemer') . '</p>',
+							            'notice'
+						            );
+						            break;
+					            case 'load_set':
+						            $this->log(
+							            esc_html__('Media query set loaded', 'microthemer'),
+							            '<p>' . sprintf( esc_html__('A new media query set %1$s your existing media queries: %2$s', 'microthemer'), $load_action, htmlentities($_POST['tvr_preferences']['load_mq_set']) ) . '</p>',
+							            'notice'
+						            );
+						            break;
+				            }
+
+				            // if the user deleted a media query, ensure data is cleaned from the ui data
+				            $this->clean_deleted_media_queries($orig_media_queries, $pref_array['m_queries']);
+
+			            }
+			            // save last message in database so that it can be displayed on page reload (just once)
+			            $this->cache_global_msg();
+			            wp_die();
+		            }
+
+		            // update the enqueued JS files
+		            if (isset($_POST['mt_enqueue_js_submit'])){
+			            // remove backslashes from $_POST
+			            $_POST = $this->deep_unescape($_POST, 0, 1, 1);
+			            $pref_array['enq_js'] = $_POST['tvr_preferences']['enq_js'];
+			            $pref_array['num_saves'] = ++$this->preferences['num_saves'];
+			            // save and present message
+			            if ($this->savePreferences($pref_array)) {
+				            $this->log(
+					            esc_html__('Enqueued scripts were updated', 'microthemer'),
+					            '<p>' . esc_html__('Your enqueued scripts were successfully updated.', 'microthemer') . '</p>',
+					            'notice'
+				            );
+			            }
+
+			            // save last message in database so that it can be displayed on page reload (just once)
+			            $this->cache_global_msg();
+			            wp_die();
+		            }
+
+		            // reset default preferences
+		            if (isset($_POST['tvr_preferences_reset'])) {
+			            check_admin_referer('tvr_preferences_reset');
+			            $pref_array = $this->default_preferences;
+			            if ($this->savePreferences($pref_array)) {
+				            $this->log(
+					            esc_html__('Preferences were reset', 'microthemer'),
+					            '<p>' . esc_html__('The default program preferences were reset.', 'microthemer') . '</p>',
+					            'notice'
+				            );
+			            }
+		            }
+
+
+		            // css filter configs
+		            $filter_types = array('page_specific', 'pseudo_classes', 'pseudo_elements', 'favourite_filter');
+		            foreach ($filter_types as $type){
+			            if (isset($_GET[$type])) {
+				            $this->preferences[$type][$_GET['pref_sub_key']] = intval($_GET[$type]);
+				            $pref_array[$type] = $this->preferences[$type];
+				            $this->savePreferences( $pref_array );
+				            //echo '<pre>'. print_r($this->preferences[$type], true).'</pre>';
+				            wp_die();
+			            }
+		            }
+
+		            // if we got to hear, the ajax request didn't work as intended, so warn
+		            echo 'Yo! The Ajax call failed to trigger any function. Sort it out.';
+		            wp_die();
+
+	            }
+
+            }
+
+			// Microthemer UI page - also accessible via ajax call
+			function microthemer_ui_page() {
+
+				// only run code if it's the ui page
+				if ( isset($_GET['page']) and $_GET['page'] == $this->microthemeruipage ) {
+
+					if (!current_user_can('administrator')){
+						wp_die('Access denied');
 					}
 
-					// Not an ajax call, show the interface
-
-					// validate email todo make this an ajax request, with validation
+					// validate email todo make this an ajax request, with user feedback
 					if (isset($_POST['tvr_ui_validate_submit'])) {
+
+						check_ajax_referer( 'tvr_validate_form', '_wpnonce' );
+
+					    // tvr_validate_form
 						$this->get_validation_response($_POST['tvr_preferences']['buyer_email']);
+					}
+
+					// if user navigates from front to MT via toolbar, set previous front page in preview
+					if (isset($_GET['mt_preview_url'])) {
+
+						// if we're on the demo site, skip nonce check (we only allow page to be set, not arbitrary domain)
+						if (!$this->is_demo_site()) {
+							if (!wp_verify_nonce($_REQUEST['_wpnonce'], 'mt-preview-nonce')) {
+								die( 'Security check failed' );
+							}
+						}
+
+						$this->maybe_set_preview_url();
 					}
 
 					// if draft mode is on, but user accessing MT GUI isn't in draft_mode_uids array,
@@ -5336,18 +5614,13 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 						$this->savePreferences($pref_array);
 					}
 
-					// if user navigates from front to MT via toolbar, set previous front page in preview
-					$this->maybe_set_preview_url('mt-preview-nonce');
+					// ensure Preview URL matches HTTPS in admin
+                    $this->ensure_iframe_protocol_matches_admin();
 
 					// maybe check valid subscription
 					$this->maybe_check_subscription();
 
-					/*$pref_array = $this->preferences;
-					$pref_array['subscription']['renewal_check'] = '2018-06-06';
-					$pref_array['retro_sub_check_done'] = false;
-					$this->savePreferences($pref_array);*/
-
-					// include user interface
+					// Display user interface
 					include $this->thisplugindir . 'includes/tvr-microthemer-ui.php';
 
 				}
@@ -5355,16 +5628,28 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 
 			// Documentation page
 			function microthemer_docs_page(){
+
 				// only run code on docs page
 				if ($_GET['page'] == $this->docspage) {
+
+					if (!current_user_can('administrator')){
+						wp_die('Access denied');
+					}
+
 					include $this->thisplugindir . 'includes/internal-docs.php';
 				}
 			}
 
 			// fonts page
 			function microthemer_fonts_page(){
-				// only run code on docs page
+
+			    // only run code on docs page
 				if ($_GET['page'] == $this->fontspage) {
+
+					if (!current_user_can('administrator')){
+						wp_die('Access denied');
+					}
+
 					include $this->thisplugindir . 'includes/fonts.php';
 				}
 			}
@@ -5426,11 +5711,20 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 
 			// Manage Micro Themes page
 			function manage_micro_themes_page() {
-				// only run code if it's the manage themes page
+
+			    // only run code if it's the manage themes page
 				if ( $_GET['page'] == $this->microthemespage ) {
 
+					if (!current_user_can('administrator')){
+						wp_die('Access denied');
+					}
+
 					// handle zip upload
-					$this->process_uploaded_zip();
+					if (isset($_POST['tvr_upload_micro_submit'])) {
+						check_admin_referer('tvr_upload_micro_submit');
+						$this->process_uploaded_zip();
+					}
+
 
 					// notify that design pack was successfully deleted (operation done via ajax on single pack page)
 					if (!empty($_GET['mt_action']) and $_GET['mt_action'] == 'tvr_delete_ok') {
@@ -5441,23 +5735,6 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 							'notice'
 						);
 					}
-
-					/* create new micro theme
-					if (isset($_POST['tvr_create_micro_submit'])) {
-						check_admin_referer('tvr_create_micro_submit');
-						$micro_name = esc_attr( $_POST['micro_name']);
-						if ( !empty($micro_name) ) {
-							$this->create_micro_theme($micro_name, 'create', '');
-						}
-						else {
-							$this->log(
-								esc_html__('Please specify a name', 'microthemer'),
-								'<p>' . esc_html__('You didn\'t enter anything in the "Name" field. Please try again.', 'microthemer') . '</p>'
-							);
-
-						}
-					}
-					*/
 
 					// handle edit micro selection
 					if (isset($_POST['tvr_edit_micro_submit'])) {
@@ -5514,8 +5791,15 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 				// only run code on preferences page
 				if( $_GET['page'] == $this->managesinglepage ) {
 
+					if (!current_user_can('administrator')){
+						wp_die('Access denied');
+					}
+
 					// handle zip upload
-					$this->process_uploaded_zip();
+					if (isset($_POST['tvr_upload_micro_submit'])) {
+						check_admin_referer('tvr_upload_micro_submit');
+						$this->process_uploaded_zip();
+					}
 
 					// update meta.txt
 					if (isset($_POST['tvr_edit_meta_submit'])) {
@@ -5613,6 +5897,10 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 				// only run code on preferences page
 				if( $_GET['page'] == $this->preferencespage ) {
 
+					if (!current_user_can('administrator')){
+						wp_die('Access denied');
+					}
+
 					// this is a separate include because it needs to have separate page for changing gzip
 					$page_context = $this->preferencespage;
 					echo '
@@ -5641,6 +5929,10 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 				// only run code on preferences page
 				if( $_GET['page'] == $this->detachedpreviewpage ) {
 
+					if (!current_user_can('administrator')){
+						wp_die('Access denied');
+					}
+
 					// this is a separate include because it needs to have separate page for changing gzip
 					$page_context = $this->detachedpreviewpage;
 					$ui_class = '';
@@ -5648,7 +5940,7 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 					$this->preferences['show_rulers'] ? $ui_class.= ' show_rulers' : false;
 					echo '
                     <div id="tvr" class="wrap tvr-wrap '.$ui_class.'">
-                        <span id="ajaxUrl" rel="' . $this->wp_ajax_url.'"></span>
+                        <span id="ajaxUrl" rel="'.$this->wp_ajax_url.'"></span>
                         <span id="returnUrl" rel="admin.php?page=' . $this->preferencespage.'"></span>
                         <div id="preview-standalone">';
 
@@ -6868,7 +7160,7 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 			// output meta spans and logs tmpl for manage pages
 			function manage_packs_meta(){
 				?>
-                <span id="ajaxUrl" rel="<?php echo $this->site_url.'/wp-admin/admin.php?page='.$this->microthemeruipage.'&mcth_simple_ajax=1&_wpnonce='.wp_create_nonce('mcth_simple_ajax') ?>"></span>
+                <span id="ajaxUrl" rel="<?php echo $this->wp_ajax_url; ?>"></span>
                 <span id="delete-ok" rel='admin.php?page=<?php echo $this->microthemespage;?>&mt_action=tvr_delete_ok&_wpnonce=<?php echo wp_create_nonce('tvr_delete_ok'); ?>'></span>
                 <span id="zip-folder" rel="<?php echo $this->thispluginurl.'zip-exports/'; ?>"></span>
 				<?php
@@ -7037,11 +7329,13 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 				// menu groups
 				foreach ($this->menu as $group_key => $arr){
 
+
+
 					$html.= '
 					<li class="mt-group '.$group_key.'">
-						<span>'. $arr['name'] . '</span>';
+						<span class="mt-group-heading mt-group-heading-'.$group_key.'">'. $arr['name'] . '</span>';
 					if (!empty($arr['sub'])){
-						$html.= '<ul class="mt-sub">';
+						$html.= '<ul class="mt-sub mt-sub-'.$group_key.'">';
 
 						// menu items
 						foreach ($arr['sub'] as $item_key => $arr2){
@@ -7072,6 +7366,8 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 							$class.= (isset($arr2['item_link'])) ? ' item-link' : '';
 							$class.= (!empty($arr2['new_set'])) ? ' new-set' : '';
 							$show_dialog = $class.= (!empty($arr2['dialog'])) ? ' show-dialog' : '';
+							$icon_title = !empty($arr2['icon_title']) ? 'title="'.$arr2['icon_title'].'"' : '';
+							$sup_checkboxes = !empty($arr2['checkboxes']) ? $arr2['checkboxes'] : false;
 
 							// item
 							$html.= '<li '.$id.' '.$data_attr.' '.$rel.' class="mt-item '.$item_key.' '.$class.'"
@@ -7083,7 +7379,7 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 							}
 
 							// icon
-							$html.= '<span '.$icon_id.' class="mt-menu-icon '.$icon_class.' '.$show_dialog.'"></span>';
+							$html.= '<span '.$icon_id.' class="mt-menu-icon '.$icon_class.' '.$show_dialog.'" '.$icon_title.'></span>';
 
 							// text label
 							$colon = isset($arr2['toggle']) & ($item_key!= 'highlighting') ? ':' : '';
@@ -7104,18 +7400,29 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 							// do we need input?
 							if (isset($arr2['input'])){
 								$input_id = !empty($arr2['input_id']) ? 'id="'.$arr2['input_id'].'"' : '';
+								$input_name = !empty($arr2['input_name']) ? $arr2['input_name'] : '';
+								$input_placeholder = !empty($arr2['input_placeholder']) ? $arr2['input_placeholder'] : '';
 								$html.= '
-								<div class="combobox-wrap tvr-input-wrap hidden">
-									<input type="text" name="set_preview_url" 
+								<div class="combobox-wrap tvr-input-wrap">
+								
+								    '.$this->maybe_output_supplementary_checkboxes($sup_checkboxes).' 
+									<input type="text" name="'.$input_name.'" 
+									placeholder="'.$input_placeholder.'"
 									'.$input_id.' class="combobox has-arrows"
 									rel="'.$arr2['combo_data'].'"
 									value="'.$arr2['input'].'" />
 									<span class="combo-arrow"></span>
 									<span class="tvr-button '.$arr2['button']['class'].'">
-								'.$arr2['button']['text'].'
-								</span>
+								    '.$arr2['button']['text'].'
+								    </span>
+								    
 								</div>
 								';
+							}
+
+							// custom display value
+							if (isset($arr2['display_value'])){
+								$html.= $arr2['display_value'];
 							}
 
 							if (!empty($arr2['item_link'])){
@@ -7131,6 +7438,28 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 				$html.= '</ul>';
 				return $html;
 			}
+
+			function maybe_output_supplementary_checkboxes($checkboxes){
+
+			    if (!$checkboxes){
+			        return '';
+                }
+
+			    $html = '';
+
+			    if (!empty($checkboxes)){
+			        foreach ($checkboxes as $item){
+				        $html.= '<div class="menu-supplementary-checkbox tvr-clearfix">
+                            <input type="checkbox" name="'.$item['name'].'"> 
+                            <span class="fake-checkbox "></span>
+                            <span class="ef-label">'.$item['label'].'</span>
+                        </div>';
+                    }
+                }
+
+                return $html;
+
+            }
 
 			function toggle($item_key, $arr){
 				$on = $arr['toggle'] ? 'on' : '';
@@ -7187,6 +7516,243 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 				}
 				return $html;
 			}
+
+			// search posts by title or slug so we get precise search results
+			function search_by_title_or_slug( $search, $wp_query ) {
+
+				if ( ! empty( $search ) && ! empty( $wp_query->query_vars['search_terms'] ) ) {
+					global $wpdb;
+
+					$q = $wp_query->query_vars;
+					$n = ! empty( $q['exact'] ) ? '' : '%';
+
+					$search = array();
+
+					foreach ( ( array ) $q['search_terms'] as $term )
+						$sql_term = $n . $wpdb->esc_like( $term ) . $n;
+					$search[] = $wpdb->prepare(
+						"$wpdb->posts.post_title LIKE %s or 
+						$wpdb->posts.post_name LIKE %s or 
+						$wpdb->posts.post_type LIKE %s",
+						$sql_term,
+						$sql_term,
+						$sql_term
+					);
+
+					if ( ! is_user_logged_in() )
+						$search[] = "$wpdb->posts.post_password = ''";
+
+					$search = ' AND ' . implode( ' AND ', $search );
+				}
+
+				//echo 'mysearch: ' . $search;
+
+				return $search;
+			}
+
+			function get_custom_post_types(){
+
+			    $args = array(
+					'public'   => true,
+					'_builtin' => false,
+				);
+
+				$output = 'objects'; // names or objects, note names is the default
+				$operator = 'and'; // 'and' or 'or'
+
+				return get_post_types( $args, $output, $operator );
+			}
+
+			function format_posts_of_type(
+			    $post_type, $category, $permalink_structure, $common_config, &$urls
+            ){
+
+			    $isCustomPosts = ($post_type !== 'page' && $post_type !== 'post');
+			    $customPostsPathPrefix = $isCustomPosts
+                    ? '/'.$post_type
+                    : '';
+
+			    $items = get_posts(
+					array_merge($common_config, array('post_type'=> $post_type))
+				);
+
+				foreach($items as $item){
+
+				    // I noticed a strange bug whereby "kit" should have got an elementor template post in 'My Templates'
+                    // category, but also got the search result in all other post categories inc regular page/post
+                    if ($item->post_type !== $post_type){
+                        continue;
+                    }
+
+					$label = $item->post_title;
+					$path = $customPostsPathPrefix.'/'.$item->post_name.'/';
+					//$url = rtrim($root_home_url, '/') . $path;
+
+					// if non-standard permalink structure, we have to use the DB method of gettin the URL
+					if ($permalink_structure !== '/%postname%/' or $item->post_type === 'ct_template'){
+
+						// it seems to be a quirk of Oxygen that the template admin screen must be loaded first
+					    if ($item->post_type === 'ct_template'){
+							$url = $this->wp_blog_admin_url . 'post.php?post=' . $item->ID.'&action=edit';
+						} else {
+							$url = get_permalink($item);
+                        }
+
+						//$url = get_permalink($item);
+
+						$path = $this->root_rel($url, false, true);
+					}
+
+					// exception for Oxygen - template pages produce PHP error is loaded on frontend
+					// without ct_builder paramter
+					/*if ($item->post_type === 'ct_template'){
+						$path = tvr_common::append_url_param($path, 'ct_builder', 'true');
+					}*/
+
+					$urls[$post_type][$label] = array(
+						'label' => $label,
+						'value' => $path,
+						'category' => $category,
+						'item_id' => !empty($item->ID) ? $item->ID : false,
+						'all' => $item, // debug
+                        //'config' => array_merge($common_config, array('post_type'=> $post_type))
+					);
+				}
+
+				// sort alphabetically within category - actually no, have recently modified near top
+				// ksort($urls[$post_type]);
+
+			}
+
+			// get example category, author, archive, 404
+			function get_resource_example(){
+                // todo
+            }
+
+			function get_site_pages($searchTerm = null){
+
+				// get URL vars
+                $blog_details = function_exists('get_blog_details')
+                    ? get_blog_details( $this->multisite_blog_id )
+                    : false;
+				/*$root_home_url = $blog_details
+                    ? rtrim($blog_details->path, '/')
+                    : $this->home_url;*/
+                $permalink_structure = get_option('permalink_structure');
+				$users_can_register = get_option('users_can_register');
+			    $common_config = array(
+                    'post_status'=>'publish',
+                    'numberposts' => 8,
+                    'suppress_filters' => false,
+                    'orderby' => 'modified',
+                    'order' => 'DESC',
+                    's' => $searchTerm
+                );
+
+			    // Get data
+                $urls = array();
+				$formatted_urls = array();
+                $urlTypes = array(
+	                'page' => esc_html__('Pages', 'microthemer'),
+	                'post' => esc_html__('Posts', 'microthemer'),
+	                'wordpress' => esc_html__('WordPress', 'microthemer'),
+	                'custom_posts' => esc_html__('Custom posts', 'microthemer'),
+                    'general' => esc_html__('General', 'microthemer'),
+                );
+                $custom_post_types = $this->get_custom_post_types();
+
+                foreach ($urlTypes as $key => $category){
+
+                    // regular post or page
+                    if ($key === 'page' || $key === 'post'){
+                        $post_type = $key;
+                        $this->format_posts_of_type(
+	                        $post_type, $category, $permalink_structure, $common_config, $urls
+                        );
+                    }
+
+	                // custom posts
+                    elseif ($key === 'custom_posts'){
+
+		                //$urls[$key] = $custom_post_types;
+		                foreach ($custom_post_types as $index => $custom_post_type){
+                            $category = $custom_post_type->label;
+			                $post_type = $custom_post_type->name;
+			                $this->format_posts_of_type(
+				                $post_type, $category, $permalink_structure, $common_config, $urls
+			                );
+		                }
+
+                    }
+
+                    // general / wordpress
+                    elseif ($key === 'general' || $key === 'wordpress'){
+
+	                    $custom_links = array();
+
+	                    // WordPress auth pages
+	                    if ($key === 'wordpress'){
+
+		                    $custom_links = array(
+			                    array(
+				                    'label' => esc_html__('Login page', 'microthemer'),
+				                    'value' => $this->root_rel(wp_login_url(), false, true),
+			                    ),
+			                    array(
+				                    'label' => esc_html__('Lost password page', 'microthemer'),
+				                    'value' => $this->root_rel(wp_lostpassword_url(), false, true),
+			                    )
+		                    );
+
+		                    // if registration is supported
+		                    if ($users_can_register){
+			                    $custom_links[] = array(
+				                    'label' => esc_html__('Registration page', 'microthemer'),
+				                    'value' => $this->root_rel(wp_registration_url(), false, true),
+			                    );
+		                    }
+
+                        }
+
+	                    // General types of page - finish later
+	                    /*elseif ($key === 'general'){
+
+	                        $custom_links = array(
+			                    array(
+				                    'label' => esc_html__('Home page', 'microthemer'),
+				                    'value' => '/',
+			                    ),
+			                    array(
+				                    'label' => esc_html__('Search page', 'microthemer'),
+				                    'value' => '/?s=test',
+			                    )
+		                    );
+	                    }*/
+
+	                    // add the category and merge with urls array
+	                    foreach ($custom_links as $j => $custom_links_array){
+		                    $urls[$key][] = array_merge($custom_links_array, array('category' => $category));
+                        }
+
+                    }
+
+                }
+
+				// add category urls to flat array
+				foreach ($urls as $key => $array){
+				    if (!empty($urls[$key])){
+					    $formatted_urls = array_merge($formatted_urls, array_values($urls[$key]));
+                    }
+
+				}
+
+                //wp_die('<pre>'.print_r($urls, true).'</pre>');
+
+                //return $urls;
+
+                return $formatted_urls;
+
+            }
 
 			// Global system for creating dynamic menus (data, structure, config)
 			// Note: passing array/objs into PHP/JS functions over lots of params should become standard practice
@@ -8755,7 +9321,8 @@ $this->show_me = '<pre>$media_queries_list: '.print_r($media_queries_list, true)
 				// check if hand coded have been set - output before other css
 				$scss_custom_code = '';
 				$custom_code = '';
-				if ( !$this->trimmedEmpty($this->options['non_section']['hand_coded_css']) ){
+				if ( !empty($this->options['non_section']['hand_coded_css']) &&
+                     !empty(trim($this->options['non_section']['hand_coded_css'])) ){
 
 				    // format comment
 				    $name = esc_attr_x('Full Code Editor CSS', 'CSS comment', 'microthemer');
@@ -11130,7 +11697,7 @@ if (!is_admin()) {
 			var $preferencesName = 'preferences_themer_loader';
 			// @var array $preferences Stores the ui options for this plugin
 			var $preferences = array();
-			var $version = '6.1.1.6';
+			var $version = '6.1.5.9';
 			var $microthemeruipage = 'tvr-microthemer.php';
 			var $file_stub = '';
 			var $min_stub = '';
@@ -11162,6 +11729,13 @@ if (!is_admin()) {
 				// get custom code var
 				$this->custom_code = tvr_common::get_custom_code();
 
+				// default WP action order
+				$action_order = 999999;
+				$action_hook = 'wp_enqueue_scripts';
+
+				// logged out page view mode
+				add_action('init',  array(&$this, 'mt_nonlog'), $action_order);
+
 				// get draft, minify, and num saves
 				add_action( 'plugins_loaded', array(&$this, 'init_mt_vars'));
 
@@ -11171,9 +11745,6 @@ if (!is_admin()) {
 				    // note changed from wp_print_styles on Feb 22nd 2018 as discovered it is deprecated
 					// the inactive code was using wp_enqueue_scripts, so now the will be consistent
 
-                    $action_order = 999999;
-                    $action_hook = 'wp_enqueue_scripts';
-
                     // alternative order if user specifies stylesheet must come after Oxygen
                     if (!empty($this->preferences['after_oxy_css'])){
 	                    $action_order = 11000000; // 11m
@@ -11182,6 +11753,12 @@ if (!is_admin()) {
 
                     // add css
                     add_action( $action_hook, array(&$this, 'add_css'), $action_order);
+
+                    // add MT global stylesheet to login page unless specified otherwise
+                    if (!empty($this->preferences['global_styles_on_login'])){
+	                    add_action('login_enqueue_scripts', array(&$this, 'add_css'), $action_order);
+                    }
+
 				}
 
 				// add shortcut to Microthemer
@@ -11197,6 +11774,9 @@ if (!is_admin()) {
 				// add meta_tag if logged in - else undefined iframeUrl variable creates break error
 				add_action( 'wp_head', array(&$this, 'add_frontend_data'));
 
+				// also add to login page
+				add_action( 'login_head', array(&$this, 'add_frontend_data'));
+
 				// add <base> URL for when WP installs use a sub-directory
 				/*if (!empty($this->preferences['relative_base_url'])) {
 					add_action('wp_head', array(&$this, 'add_base_url_tag') );
@@ -11204,6 +11784,9 @@ if (!is_admin()) {
 
 				// add frontend script
 				add_action( 'wp_enqueue_scripts', array(&$this, 'add_js'), 999999);
+
+				// add MT global stylesheet to login page unless specified otherwise
+				add_action('login_enqueue_scripts', array(&$this, 'add_js'), 999999);
 
 				// add mt body classes (page-id and slug)
 				add_filter( 'body_class', array(&$this, 'add_body_classes') );
@@ -11240,6 +11823,33 @@ if (!is_admin()) {
 			}
 			*/
 
+			// non-logged in mode
+			function mt_nonlog(){
+
+				// fix for Oxygen that auto logs user back in via JavaScript
+                // didn't work
+			    /*if (isset($_GET['mt_nonlog_redirect'])){
+
+			        $plain_non_log = tvr_common::strip_url_param(
+				        $this->currentPageURL(), 'mt_nonlog_redirect'
+                    );
+
+				    wp_redirect($plain_non_log);
+
+				    exit;
+                }*/
+
+				if (isset($_GET['mt_nonlog'])) {
+
+					$nonce = !empty($_GET['_wpnonce']) ? $_GET['_wpnonce'] : false;
+					if (current_user_can("administrator") and wp_verify_nonce( $nonce, 'mt_nonlog_check' ) ) {
+						wp_set_current_user(-1);
+					} else {
+						die('Permission denied');
+					}
+				}
+            }
+
 			function init_mt_vars(){
 				// get_current_user_id() needs to be here (hooked function)
 				$this->current_user_id = get_current_user_id();
@@ -11264,15 +11874,17 @@ if (!is_admin()) {
 					$parent = 'site-name';
 				}
 
+				$currentPageURL = tvr_common::strip_page_builder_and_other_params($this->currentPageURL());
+
 				// strip Beaver Builder ?fl_builder param as users may not want BB to load most of the time
-				$currentPageURL = tvr_common::strip_url_param($this->currentPageURL(), 'fl_builder', false);
+				/*$currentPageURL = tvr_common::strip_url_param($this->currentPageURL(), 'fl_builder', false);
 
 				// strip Divi param which causes iframe to break out of parent
-				$currentPageURL = tvr_common::strip_url_param($currentPageURL, 'et_fb', true); //temp disabled for debugging
+				$currentPageURL = tvr_common::strip_url_param($currentPageURL, 'et_fb', true); //temp disabled for debugging*/
 
 				// MT admin page with front page param passed in for quick editing
 				$href = $this->wp_blog_admin_url . 'admin.php?page=' . $this->microthemeruipage .
-				        '&mt_preview_url=' . rawurlencode($currentPageURL)
+				        '&mt_preview_url=' . rawurlencode(esc_url($currentPageURL))
 				        . '&_wpnonce=' . wp_create_nonce( 'mt-preview-nonce' );
 
 				$args = array(
@@ -11348,7 +11960,7 @@ if (!is_admin()) {
 					}
 
 					// UI frontend CSS
-					if (is_user_logged_in() and TVR_MICRO_VARIANT == 'themer') {
+					if (is_user_logged_in() || isset($_GET['mt_nonlog'])) {
 						$min = !TVR_DEV_MODE ? '.min' : '';
 						$ui_frontend_handle = 'micro'.TVR_MICRO_VARIANT.'-overlay-css';
 						$ui_frontend_url = $this->thispluginurl.'css/frontend'.$min.'.css?v='.$this->version;
@@ -11362,15 +11974,11 @@ if (!is_admin()) {
 			// get the current page for iframe-meta and loading WP page after clicking WP admin MT option
 			function currentPageURL() {
 
-				/*$curpageURL = 'http';
-				if (!empty($_SERVER["HTTPS"]) and $_SERVER["HTTPS"] == "on") {
-				    $curpageURL.= "s";
-				}
-				$curpageURL.= "://";
-				$curpageURL.= $_SERVER["SERVER_NAME"].$_SERVER["REQUEST_URI"];
-				return $curpageURL;*/
+			    return tvr_common::get_protocol() . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
 
-				// new system of getting page URL
+			    /*$isSSL = (!empty($_SERVER["HTTPS"]) and $_SERVER["HTTPS"] == "on");
+
+				// new system of getting page URL - didn't work with wp-login.php
 				global $wp;
 				$curUrl = add_query_arg(
 					$_SERVER['QUERY_STRING'],
@@ -11378,12 +11986,12 @@ if (!is_admin()) {
 					trailingslashit( home_url($wp->request) )
 				);
 
-				// home_url() should get correct protocal, but just to be sure
-				if (!empty($_SERVER["HTTPS"]) and $_SERVER["HTTPS"] == "on") {
+				// home_url() should get correct protocol, but just to be sure
+				if ($isSSL) {
 					$curUrl = str_replace('http:', 'https:', $curUrl);
 				}
 
-				return $curUrl;
+				return $curUrl;*/
 			}
 
 			// add viewport intial scale = 1
@@ -11395,15 +12003,22 @@ if (!is_admin()) {
 			}
 
 			// add meta iframe-url tracker (for remembering the preview page)
-			function add_frontend_data() {
+			function add_frontend_data($any) {
 
-			    if ( is_user_logged_in() ) {
+			    if ( is_user_logged_in() || isset($_GET['mt_nonlog']) ) {
+
+			        global $wp;
 
 				    $MTDynFrontData = array(
 					    'iframe-url' => rawurlencode(
-						    tvr_common::strip_page_builder_and_preview_params($this->currentPageURL())
-					    ),
-					    'mt-show-admin-bar' => intval($this->preferences['admin_bar_preview'])
+						    esc_url(
+						      tvr_common::strip_page_builder_and_other_params($this->currentPageURL()),
+                              null,
+                              'read'
+                            )
+                        ),
+					    'mt-show-admin-bar' => intval($this->preferences['admin_bar_preview']),
+                        'page-title' => get_the_title()
 				    );
 
 				    // get Oxygen page width
@@ -11455,7 +12070,7 @@ if (!is_admin()) {
 
 				}
 
-				if ( is_user_logged_in() and TVR_MICRO_VARIANT == 'themer') {
+				if ( is_user_logged_in() || isset($_GET['mt_nonlog'])) {
 					// testing only - swap default jQuery with 2.x for future proofing
 					/*
 					$jq2 = false;

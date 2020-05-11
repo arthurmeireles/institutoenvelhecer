@@ -23,7 +23,7 @@ $this->display_log();
 <!-- Edit Preferences -->
 <form id="tvr-preferences" name='preferences_form' method="post" autocomplete="off"
 	action="admin.php?page=<?php echo $page_context;?>" >
-	<?php wp_nonce_field('tvr_preferences_submit'); ?>
+	<?php //wp_nonce_field('tvr_preferences_submit'); ?>
 	<input type="hidden" name="tvr_preferences_form" value="1" />
 	<?php echo $this->start_dialog('display-preferences', esc_html__('Edit your Microthemer preferences', 'microthemer'), 'medium-dialog',
 		array(
@@ -83,7 +83,10 @@ $this->display_log();
 					'explain' => __('General JavaScript errors on your site can interfere with Microthemer, and other plugins. Microthemer can check for errors and warn you about them.', 'microthemer')
 				),
 
-
+				'global_styles_on_login' => array(
+					'label' => __('Enable global CSS on WordPress login pages', 'microthemer'),
+					'explain' => __('Load Microthemer\'s global active-styles.css file on WordPress login, registration, and forgot password pages' , 'microthemer')
+				),
 				'admin_bar_shortcut' => array(
 					'label' => __('Add a Microthemer shortcut to the WP admin bar', 'microthemer'),
 					'explain' => __('Include a link to the Microthemer interface from the WordPress admin toolbar at the top of every page.', 'microthemer'),
@@ -242,6 +245,11 @@ $this->display_log();
 				if (!empty($this->preferences['my_props'][$prop_group]['pg_props'])){
 					$first = true;
 					foreach ($this->preferences['my_props'][$prop_group]['pg_props'] as $prop => $arr){
+
+					    if (empty($this->propertyoptions[$prop_group][$prop])){
+					        continue;
+                        }
+
 					    unset($units);
 						// user doesn't need to set all padding (for instance) individually
 						$box_model_rel = false;

@@ -131,6 +131,11 @@ include 'property-options.inc.php';
 								'mac' => 'Command+Alt+L',
 							),
 							array(
+								'action' => 'Toggle page navigator menu',
+								'win' => 'Ctrl+Alt+N',
+								'mac' => 'Command+Alt+N',
+							),
+							array(
 								'action' => 'If Sass is enabled, recompiles all MT selectors',
 								'win' => 'Ctrl+Alt+P',
 								'mac' => 'Command+Alt+P',

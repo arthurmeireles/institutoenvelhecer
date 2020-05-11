@@ -33,6 +33,9 @@ $this->set_default_folders();
 // custom code
 $this->custom_code = tvr_common::get_custom_code();
 
+// params to strip
+$this->params_to_strip = tvr_common::params_to_strip();
+
 // flatten custom_code array (easier to work with)
 foreach ($this->custom_code as $key => $arr){
 	if ($key == 'ie_css'){
@@ -505,10 +508,14 @@ $this->default_preferences = array(
 	"dock_full_editor_left" => 0,
 
 	// general
+	"global_styles_on_login" => 1,
 	"dock_wizard_right" => 0,
+	"active_scripts_footer" => 0,
+	"active_scripts_priority" => 0,
 	"hover_inspect" => 0, // this is hard set in $this->getPreferences()
 	"allow_scss" => 0, // if enabled by default, invalid css/scss will prevent stylesheet update.
 	"server_scss" => 0, // give user option to compile scss on the server
+	"specificity_preference" => 1, // 1 = high, 0 = low
 	"grid_focus" => 'gridtemplate',
 	"monitor_js_errors" => 1,
 	"generated_css_focus" => 0,
@@ -516,6 +523,7 @@ $this->default_preferences = array(
 	"hide_ie_tabs" => 1,
 	"show_extra_actions" => 1, // have the icons showing by default (change)
 	"default_sug_values_set" => 0,
+	"default_sug_variables_set" => 0,
 	"grid_highlight" => 1,
 	"expand_grid" => 0, // this doesn't get saved
 	"minify_css" => 0, // because other plugins minify, and an extra thing that can go wrong
@@ -558,6 +566,9 @@ $this->default_preferences = array(
 	//"highlighting" => 0,
 	"ruler_sizing" => array ('x' => 0, 'y' => 0),
 	"show_interface" => 1,
+	"show_sampled_variables" => 0,
+	"show_sampled_values" => 0,
+	"mt_color_variables_css" => "",
 	"enq_js" => array(),
 	"num_saves" => 0, // keep track of saves for caching purposes
 	// "show_adv_wizard" => 0,
@@ -1028,27 +1039,6 @@ $this->menu = array(
 				'dialog' => 1,
 				'class' => 'display-css-code'
 			),
-			'preview_url' => array(
-				'name' => esc_html__('Change site preview URL', 'microthemer'),
-				'short_name' => esc_html__('URL or path', 'microthemer'),
-				'title' => esc_attr__("Navigate to any page on your site by entering a custom URL",
-						'microthemer') . ' (' .
-				           esc_attr__("you can also navigate by clicking links in the site preview below",
-					           'microthemer') . ')',
-				'class' => 'switch-preview',
-				//'item_class' => 'link menu-input-toggle',
-				'text_class' => 'link menu-input-toggle',
-				'combo_data' => 'custom_paths',
-				'input' => $default_path, //$this->preferences['custom_paths'][0],
-				'input_id' => 'previewPath',
-				'button' => array(
-					'text' => esc_html__('Go', 'microthemer'),
-					'class' => 'change-preview-url'
-				)
-			),
-
-
-
 			// detach preview
 			'dock_options_left' => array(
 				'new_set' => 1,
@@ -1117,6 +1107,7 @@ $this->menu = array(
 			),
 
 			'enable_beaver_builder' => array(
+				'icon_title' => 'Ctrl + Alt + B',
 				'name' => esc_html__('Enable Beaver Builder', 'microthemer'),
 				'title' => esc_attr__("Make page editable with Beaver Builder", 'microthemer'),
 				'class' => 'toggle-beaver-builder',
@@ -1126,6 +1117,7 @@ $this->menu = array(
 			),
 
 			'activate_elementor' => array(
+				'icon_title' => 'Ctrl + Alt + B',
 				'name' => esc_html__('Enable Elementor', 'microthemer'),
 				'title' => esc_attr__("Make page editable with Elementor", 'microthemer'),
 				'class' => 'toggle-elementor',
@@ -1136,6 +1128,7 @@ $this->menu = array(
 
 			'activate_oxygen' => array(
 				'new_set' => 1,
+				'icon_title' => 'Ctrl + Alt + B',
 				'name' => esc_html__('Enable Oxygen', 'microthemer'),
 				'title' => esc_attr__("Make page editable with Oxygen", 'microthemer'),
 				'class' => 'toggle-oxygen',
@@ -1197,6 +1190,49 @@ $this->menu = array(
 
 		)
 	),
+	'preview_page' => array(
+
+		'name' => esc_html__('Page', 'microthemer'),
+		'sub' => array(
+			'current_page' => array(
+				'name' => esc_html__('Current page', 'microthemer'),
+				'title' => esc_attr__("The title of the page you are editing", 'microthemer'),
+				'display_value' => '<span class="mt-current-page-title mt-menu-text">: ...</span>',
+				'class' => 'mt-display-current-page',
+			),
+			'mt_nonlog' => array(
+				'name' => esc_html__('Load page as non-logged in user', 'microthemer'),
+				'title' => esc_attr__("Sometimes different content shows for non-logged in users.", 'microthemer'),
+				'class' => 'mt_non_logged',
+				'toggle' => !empty($this->preferences['mt_nonlog']),
+				'data-pos' => esc_attr__('Load preview as non-logged-in user', 'microthemer'),
+				'data-neg' => esc_attr__('Load preview as logged-in user', 'microthemer'),
+			),
+			'preview_url' => array(
+				'icon_title' => 'Ctrl + Alt + N',
+				'name' => esc_html__('', 'microthemer'),
+				'title' => esc_html__('Go to a new page', 'microthemer'),
+				'class' => 'switch-preview',
+				'combo_data' => 'custom_paths',
+				'input' => '', //$default_path,
+				'input_id' => 'previewPath',
+				'input_name' => 'set_preview_url',
+				'input_placeholder' => esc_html__('Search site', 'microthemer'),
+				'button' => array(
+					'text' => esc_html__('Go', 'microthemer'),
+					'class' => 'change-preview-url'
+				),
+				'checkboxes' => array(
+					array(
+						'name' => 'launch_builder',
+						'label' => 'Launch <span class="available-builder-name">builder</span> on new page'
+					)
+				)
+			),
+
+
+		)
+	),
 );
 
 // have a dev menu solely for our testing
@@ -1219,7 +1255,7 @@ if (TVR_DEV_MODE){
 				'title' => esc_attr__("Show functions that have accrued time since page load and subsequent actions.", 'microthemer'),
 				'text_class' => 'link menu-input-toggle',
 				'combo_data' => 'show_total_times',
-				'input' => 'avg_time', //$this->preferences['custom_paths'][0],
+				'input' => 'avg_time',
 				'button' => array(
 					'text' => esc_html__('OK', 'microthemer'),
 					'class' => 'change-show_total_times'

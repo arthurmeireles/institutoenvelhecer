@@ -13,10 +13,12 @@ body {
     background-color: white;
 }
 /*========================*/
-.carousel-inner {
+#box-carousel.carousel-inner {
   display: flex;
-  height: 100%;
   width: 100%;
+  height: auto !important;
+  justify-content: center;
+  align-content: center;
 }
 
 .w-100.d-block {

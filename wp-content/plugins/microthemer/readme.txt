@@ -98,6 +98,140 @@ Microthemer has built-in documentation! Just click the help icon (top right of t
 
 == Changelog ==
 
+= 6.1.5.9 (May 10th 2020) =
+
+# Bugs fixed
+* CSS grid control area included style and script tags in the set of numbered child elements.
+
+= 6.1.5.8 (May 10th 2020) =
+
+# Bugs fixed
+* The HTML pane in targeting mode didn't always load new HTML when expanding the advanced options.
+
+= 6.1.5.7 (May 8th 2020) =
+
+# Bugs fixed
+* Deleting the final selector, and then re-adding it, returned the original CSS to the custom code editor.
+* Recent update to Oxygen template loading caused issues with saving shortcodes. It seems to be a quirk of Oxygen that the template admin screen must be visited before the template can be edited visually.
+* Improved compatibility with Oxygen 3.3 and it's new post locking system. There is still scope for improvement, but Oxygen may have to update things at their end.
+
+= 6.1.5.4 (May 4th 2020) =
+
+# Enhancement
+* Microthemer auto-converts the frontend URL to HTTPS if the main MT interface is using HTTPS.
+
+# Bugs fixed
+* Loading Oxygen templates from the new 'Pages' menu didn't work under some circumstances.
+
+= 6.1.5.2 (April 30th 2020) =
+
+# Enhancement
+* Sass variables supported in new Var color picker field.
+* Improved connectivity when unlocking Microthemer.
+
+# Bugs fixed
+* Fixed issue with Beaver Builder integration: Uncaught ReferenceError: FLBuilder is not defined.
+
+= 6.1.4.9 (April 27th 2020) =
+
+# Bugs fixed
+* Clicking to the left of the new Specificity toggle label triggered the toggle.
+
+= 6.1.4.8 (April 26th 2020) =
+
+# Enhancement
+* Microthemer presents a confirm dialog when deleting a folder that contains one or more selectors.
+
+= 6.1.4.7 (April 25th 2020) =
+
+# Enhancement
+* Microthemer prioritises user-defined Oxygen classes when generating selector suggestions.
+* Microthemer auto clears grid-area shorthand when setting row/col start/end longhand properties using the input fields or the grid control area (and vice versa).
+
+# Change
+* Reduced number of recent/pages/posts in site navigation menu from 10 to 8. And reduced height of dropdown area.
+
+# Bugs fixes
+* Siteground compatibility issue: item.indexOf is not a function.
+* MT was ignoring custom classes set in Oxygen if an underscore was used (if Oxygen was active).
+* An issue with interchangeability between the code editor and grid item selectors.
+
+= 6.1.4.2 (April 23rd 2020) =
+
+# Bugs fixes
+* Siteground compatibility issue: item.indexOf is not a function.
+
+= 6.1.4.1 (April 22nd 2020) =
+
+# Enhancement
+* Microthemer's selector suggestions can be sorted by high or low specificity. This just changes the order of the suggestions in the dropdown menus. It's useful for finding broader class-based selectors more easily.
+
+= 6.1.4.0 (April 21st 2020) =
+
+# Bugs fixes
+* Issue with setting a custom preview size for the 'All Devices' tab (for mobile first design) when loading Oxygen inside Microthemer.
+* The CSS grid boundary handle could show even when all previously created selectors have been deleted.
+
+= 6.1.3.8 (April 17th 2020) =
+
+# Enhancement
+* MT explains why a new folder is created once a folder reaches the maximum number of selectors (40).
+
+
+= 6.1.3.7 (April 16th 2020) =
+
+# Bugs fixed
+* Uncaught TypeError: Cannot read property 'hasOwnProperty' of undefined (line 1432).
+
+= 6.1.3.6 (April 15th 2020) =
+
+# Bugs fixed
+* Some PHP warnings in pre-released version.
+
+= 6.1.3.5 (April 9th 2020) =
+
+# Change
+* Another tweak to the selector algorithm.
+
+# Bugs fixed
+* Issue with HTML lines not syncing up with elements correctly under some circumstances.
+* The blue dot on the grid 'Areas' tab wasn't updating when clearing all grid areas.
+* JS error 'Cannot read property pageYOffset' when using grid control if page builder was midway through loading.
+* MT was generating invalid selectors for WooCommerce content when Oxygen was activate.
+
+= 6.1.3.0 (April 6th 2020) =
+
+# Enhancement
+* New 'All' tab added to grid properties. This is very useful for overriding flexbox or float layouts and resetting grid item positions on mobile.
+
+= 6.1.2.9 (April 2nd 2020) =
+
+# Change
+* Tweaked the selector algorithm to favour selectors with a nearby parent context.
+
+# Bugs fixed
+* Microthemer only samples CSS variables defined in the global scope using 'html', '':root', or 'body' selectors.
+
+= 6.1.2.7 (April 2nd 2020) =
+
+# Change
+* Recent pages menu has been moved from the 'View' menu to a new 'Page' menu, and has been enhanced.
+
+# Enhancements
+* New 'Page' menu with site search facility and option to load pages as a non-logged in user.
+* Toggle 'Page' menu using a new keyboard shortcut: Ctrl + Alt + N.
+* Option to auto-launch any installed paged builder on new pages (supports Elementor, Beaver Builder, Oxygen).
+* Previously entered CSS property values update in the menu quickly, without having to reopen the menu.
+* 'Sampled values' option added to more CSS properties for checking commonly used values for a specific property. This helps keep styling consistent.
+* 'Site variables' option added to CSS properties for easily applying CSS variables instead of hard-coded values.
+* Site variables in use on the site can also be sampled. This helps when integrating with other plugins like 'Central Color Palette'.
+* Color picker now has a field for entering variables.
+
+# Bugs fixed
+* CSS background shorthand could have invalid formatting if background-repeat and background-size were non-default values.
+* False positive code editor warnings when using CSS variables.
+* Using variables with the Google fonts fields didn't work.
+
 = 6.1.1.6 (March 18th 2020) =
 
 # Enhancement

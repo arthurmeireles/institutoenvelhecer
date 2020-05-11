@@ -1,6 +1,6 @@
 
 <!DOCTYPE html>
-<html <?php language_attributes();?> >
+<html <?php language_attributes();?> style="width:100%">
 
 <head>
     <meta charset=" <?php bloginfo('charset');?> ">
@@ -10,10 +10,13 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,700">
 
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
     <?php wp_head(); ?>
 </head>
 
-<body>
+<body onload="iniciaCarousel()">
 <nav class="navbar navbar-dark navbar-expand-md fixed-top bg-dark">
     <div class="container"><button data-toggle="collapse" class="navbar-toggler" data-target="#navcol-1"><span class="sr-only">Toggle navigation</span><span class="navbar-toggler-icon"></span></button>
         <div class="collapse navbar-collapse" id="navcol-1">
@@ -29,6 +32,9 @@
                 <li class="nav-item" role="presentation">
                     <a class="nav-link" href="/institutoenvelhecer/eventos/">Eventos</a>
                 </li>
+<!--                <li class="nav-item" role="presentation">-->
+<!--                    <a class="nav-link" href="/institutoenvelhecer/noticias/">Notícias</a>-->
+<!--                </li>-->
                 <li class="nav-item" role="presentation"><a class="nav-link" href="/institutoenvelhecer/sobre/">Sobre nós</a></li>
                 <li class="nav-item" role="presentation"><a class="nav-link" href="/institutoenvelhecer/contato/">Contato</a></li>
                 <li class="nav-item" role="presentation"><a class="nav-link" href="https://ufrn.br/"><img class="logo-header" src="/institutoenvelhecer/wp-content/uploads/2020/04/ufrn-60-anos.png"></a></li>

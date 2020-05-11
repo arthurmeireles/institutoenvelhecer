@@ -8,20 +8,17 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="ComposerSettings">
-    <execution>
-      <executable />
-    </execution>
+    <execution />
   </component>
   <component name="ProjectId" id="1ZzLtuzGjGR9p60qp7GsR69bd0R" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
-    <option name="showExcludedFiles" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
   <component name="PropertiesComponent">
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/../../.." />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
     <property name="node.js.detected.package.eslint" value="true" />
     <property name="node.js.detected.package.tslint" value="true" />
     <property name="node.js.path.for.package.eslint" value="project" />
@@ -50,28 +47,48 @@
       <workItem from="1586099688069" duration="7955000" />
       <workItem from="1586188624901" duration="8363000" />
       <workItem from="1586211335730" duration="36596000" />
+      <workItem from="1587333335954" duration="9632000" />
+      <workItem from="1587570240343" duration="9239000" />
+      <workItem from="1587654287937" duration="10514000" />
+      <workItem from="1587744299877" duration="8714000" />
+      <workItem from="1587997014185" duration="5111000" />
+      <workItem from="1588094955633" duration="3254000" />
+      <workItem from="1588180851149" duration="23796000" />
+      <workItem from="1588353627390" duration="850000" />
+      <workItem from="1588433928712" duration="4162000" />
+      <workItem from="1588596597900" duration="30837000" />
+      <workItem from="1588689815795" duration="669000" />
+      <workItem from="1588696892186" duration="1264000" />
+      <workItem from="1588803982007" duration="1779000" />
+      <workItem from="1588874724851" duration="4230000" />
+      <workItem from="1588880416079" duration="9110000" />
+      <workItem from="1589158849487" duration="601000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
-    <option name="version" value="1" />
+    <option name="version" value="2" />
   </component>
   <component name="WindowStateProjectService">
-    <state x="692" y="322" key="#com.intellij.fileTypes.FileTypeChooser" timestamp="1586229640495">
+    <state x="692" y="322" key="#com.intellij.fileTypes.FileTypeChooser" timestamp="1588879031127">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state x="692" y="322" key="#com.intellij.fileTypes.FileTypeChooser/0.0.1920.1040@0.0.1920.1040" timestamp="1586229640495" />
+    <state x="692" y="322" key="#com.intellij.fileTypes.FileTypeChooser/0.0.1920.1040@0.0.1920.1040" timestamp="1588879031127" />
     <state x="740" y="274" key="FileChooserDialogImpl" timestamp="1586355798625">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state x="740" y="274" key="FileChooserDialogImpl/0.0.1920.1040@0.0.1920.1040" timestamp="1586355798625" />
-    <state x="794" y="443" key="NewPhpFileDialog" timestamp="1586229676991">
+    <state x="794" y="443" key="NewPhpFileDialog" timestamp="1588879400086">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state x="794" y="443" key="NewPhpFileDialog/0.0.1920.1040@0.0.1920.1040" timestamp="1586229676991" />
+    <state x="794" y="443" key="NewPhpFileDialog/0.0.1920.1040@0.0.1920.1040" timestamp="1588879400086" />
     <state x="661" y="343" key="com.intellij.ide.util.TipDialog" timestamp="1586211345411">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state x="661" y="343" key="com.intellij.ide.util.TipDialog/0.0.1920.1040@0.0.1920.1040" timestamp="1586211345411" />
+    <state x="667" y="122" width="585" height="795" key="find.popup" timestamp="1587412614672">
+      <screen x="0" y="0" width="1920" height="1040" />
+    </state>
+    <state x="667" y="122" width="585" height="795" key="find.popup/0.0.1920.1040@0.0.1920.1040" timestamp="1587412614672" />
   </component>
 </project>

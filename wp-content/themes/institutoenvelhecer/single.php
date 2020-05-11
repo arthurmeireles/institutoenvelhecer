@@ -3,7 +3,7 @@
 
 <?php while (have_posts()) : if (have_posts()) : the_post(); ?>
 
-    <div class="article-list pb-3">
+    <div class="article-list pb-3" style="min-height: 64.4vh">
 
         <div class="container">
             <div class="row">

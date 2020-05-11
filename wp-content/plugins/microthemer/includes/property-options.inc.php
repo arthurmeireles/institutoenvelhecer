@@ -4,6 +4,11 @@ if (preg_match('#' . basename(__FILE__) . '#', $_SERVER['PHP_SELF'])) {
 	die('Please do not call this page directly.');
 }
 
+$colorvars_sug_config = array(
+	'this' => 1,
+	'root_cat' => 'color_extra'
+);
+
 // tips that repeat
 $height_percentage_tip = esc_html__('Tip: setting height, min-height, or max-height as a percentage won\'t work unless the parent element has an explicit value for height.', 'microthemer');
 $border_radius_unconvertable = esc_html__('There is no direct equivalent between pixels and percent values for border radius.', 'microthemer');
@@ -95,7 +100,8 @@ $propertyOptions['font']['font_family'] = array(
 	'new_pg_cat' => esc_attr__('Text', 'microthemer'), // for delimiting property group categories
 	// reference map for getting property values from stylesheet
 	'sug_values' => array(
-		'this' => 1
+		'this' => 1,
+		'root_cat' => 'font_family'
 		// 'sh' => is checked too
 	),
 	'type' => 'combobox',
@@ -143,7 +149,9 @@ $propertyOptions['font']['google_font'] = array(
 	// set empty array for this, we're not currently getting this from site scan, as it will show up in font-family
 	// but my_props will update with user inserting google fonts
 	'sug_values' => array(
-		'non_gathered' => 1
+		//'non_gathered' => 1,
+		'this' => 1,
+		'root_cat' => 'font_family'
 	),
 	'icon' => '30',
 	// ref
@@ -177,6 +185,7 @@ $propertyOptions['font']['color'] = array(
 		'this' => 1,
 		'root_cat' => 'color'
 	),
+	'sug_values_extra' => $colorvars_sug_config,
 	'icon' => '26',
 	// ref
 	'ref_desc' => "<p>The color property specifies the color of text. The reason it wasn't named \"text-color\" is a mystery.</p>",
@@ -1068,7 +1077,7 @@ $propertyOptions['shadow']['text_shadow_x'] = array(
 	'select_options' => $text_shadow_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		//// 'root_cat' => 'text_shadow'
+		 'root_cat' => 'text_shadow'
 	),
 	'hide imp' => 1,
 	'icon' => '39',
@@ -1113,7 +1122,7 @@ $propertyOptions['shadow']['text_shadow_y'] = array(
 	'select_options' => $text_shadow_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		//// 'root_cat' => 'text_shadow'
+		'root_cat' => 'text_shadow'
 	),
 	'hide imp' => 1,
 	'icon' => '40',
@@ -1144,7 +1153,7 @@ $propertyOptions['shadow']['text_shadow_blur'] = array(
 	'select_options' => $shadow_blur,
 	'sug_values' => array(
 		'this' => 1,
-		//// 'root_cat' => 'text_shadow'
+		'root_cat' => 'text_shadow'
 	),
 	'hide imp' => 1,
 	'icon' => '42',
@@ -1204,7 +1213,7 @@ $propertyOptions['shadow']['box_shadow_x'] = array(
 	'select_options' => $box_shadow_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		//// 'root_cat' => 'box_shadow'
+		'root_cat' => 'box_shadow'
 	),
 	'field-class' => 'icon-size-2',
 	'input-class' => 'size-0b',
@@ -1264,7 +1273,7 @@ $propertyOptions['shadow']['box_shadow_y'] = array(
 	'select_options' => $box_shadow_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		//// 'root_cat' => 'box_shadow'
+		'root_cat' => 'box_shadow'
 	),
 	'input-class' => 'size-0b',
 	'hide imp' => 1,
@@ -1294,7 +1303,7 @@ $propertyOptions['shadow']['box_shadow_blur'] = array(
 	'select_options' => $shadow_blur,
 	'sug_values' => array(
 		'this' => 1,
-		//// 'root_cat' => 'box_shadow'
+		'root_cat' => 'box_shadow'
 	),
 	'field-class' => 'icon-size-2',
 	'input-class' => 'size-0b',
@@ -1326,7 +1335,7 @@ $propertyOptions['shadow']['box_shadow_spread'] = array(
 	'select_options' => $box_shadow_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		//// 'root_cat' => 'box_shadow'
+		'root_cat' => 'box_shadow'
 	),
 	'input-class' => 'size-0b',
 	'icon' => '31,4',
@@ -1481,7 +1490,8 @@ $propertyOptions['background']['background_image'] = array(
 	'field-class' => 'last span-3 grid-large',
 	'input-class' => 'bg-image-select size-very-big',
 	'sug_values' => array(
-		'this' => 1
+		'this' => 1,
+
 	),
 	'potential_gradient' => 1,
 	/*'select_options' => array(
@@ -1504,8 +1514,9 @@ $propertyOptions['background']['background_image'] = array(
 	'group_tutorials' => 1
 );
 
+
 $propertyOptions['background']['background_position'] = array(
-	'sh' => array('background', 2, array(
+	'sh' => array('background', 4, array(
 		'initial' => '0% 0%', // todo pattern match 0|0 0|0% 0%
 		'optional' => 1
 	)),
@@ -1565,7 +1576,7 @@ $propertyOptions['background']['background_position'] = array(
 );
 
 $propertyOptions['background']['background_repeat'] = array(
-	'sh' => array('background', 3, array(
+	'sh' => array('background', 2, array(
 		'initial' => 'repeat',
 		'optional' => 1
 	)),
@@ -1600,7 +1611,7 @@ $propertyOptions['background']['background_repeat'] = array(
 );
 
 $propertyOptions['background']['background_attachment'] = array(
-	'sh' => array('background', 4, array(
+	'sh' => array('background', 3, array(
 		'initial' => 'scroll',
 		'optional' => 1
 	)),
@@ -1968,7 +1979,7 @@ $propertyOptions['dimensions']['width'] = array(
 	'sug_values' => array(
 		'this' => 1,
 		//'pattern' => '^(?:(?:min|max)\-)?width',
-		// 'root_cat' => 'width' // common key shared by all width properties, for storing all width values in on array
+		'root_cat' => 'width' // common key shared by all width properties, for storing all width values in on array
 	),
 	'icon' => '9',
 	// ref
@@ -2018,7 +2029,7 @@ $propertyOptions['dimensions']['min_width'] = array(
 	'sug_values' => array(
 		'this' => 1,
 		//'pattern' => '^(?:(?:min|max)\-)?width',
-		// 'root_cat' => 'width'
+		'root_cat' => 'width'
 	),
 	'icon' => '36, 14',
 	// ref
@@ -2058,7 +2069,7 @@ $propertyOptions['dimensions']['max_width'] = array(
 	'sug_values' => array(
 		'this' => 1,
 		//'pattern' => '^(?:(?:min|max)\-)?width',
-		// 'root_cat' => 'width'
+		'root_cat' => 'width'
 	),
 	'icon' => '34, 14',
 	// ref
@@ -2101,7 +2112,7 @@ $propertyOptions['dimensions']['height'] = array(
 	'sug_values' => array(
 		'this' => 1,
 		//'pattern' => '^(?:(?:min|max)\-)?height',
-		// 'root_cat' => 'height'
+		'root_cat' => 'height'
 	),
 	'icon' => '10',
 	// ref
@@ -2142,7 +2153,7 @@ $propertyOptions['dimensions']['min_height'] = array(
 	'sug_values' => array(
 		'this' => 1,
 		//'pattern' => '^(?:(?:min|max)\-)?height',
-		// 'root_cat' => 'height'
+		'root_cat' => 'height'
 	),
 	'icon' => '37, 14',
 	// ref
@@ -2183,7 +2194,7 @@ $propertyOptions['dimensions']['max_height'] = array(
 	'sug_values' => array(
 		'this' => 1,
 		//'pattern' => '^(?:(?:min|max)\-)?height',
-		// 'root_cat' => 'height'
+		'root_cat' => 'height'
 	),
 	'icon' => '35, 14',
 	// ref
@@ -2305,7 +2316,7 @@ $propertyOptions['padding_margin']['padding_top'] = array(
 	'select_options' => $padding_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		// 'root_cat' => 'padding' // I considered padding_margin here, but there will be lots of P&M values
+		'root_cat' => 'spacing' // I considered padding_margin here, but there will be lots of P&M values
 	),
 	'rel' => 'padding',
 	'icon' => '3',
@@ -2355,7 +2366,7 @@ $propertyOptions['padding_margin']['padding_right'] = array(
 	'select_options' => $padding_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		// 'root_cat' => 'padding' // I considered padding_margin here, but there will be lots of P&M values
+		'root_cat' => 'spacing' // I considered padding_margin here, but there will be lots of P&M values
 	),
 	'rel' => 'padding',
 	'icon' => '2',
@@ -2392,7 +2403,7 @@ $propertyOptions['padding_margin']['padding_bottom'] = array(
 	'select_options' => $padding_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		// 'root_cat' => 'padding' // I considered padding_margin here, but there will be lots of P&M values
+		'root_cat' => 'spacing' // I considered padding_margin here, but there will be lots of P&M values
 	),
 	'rel' => 'padding',
 	'icon' => '4',
@@ -2430,7 +2441,7 @@ $propertyOptions['padding_margin']['padding_left'] = array(
 	'select_options' => $padding_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		// 'root_cat' => 'padding' // I considered padding_margin here, but there will be lots of P&M values
+		'root_cat' => 'spacing' // I considered padding_margin here, but there will be lots of P&M values
 	),
 	'rel' => 'padding',
 	'field-class' => 'last',
@@ -2473,7 +2484,7 @@ $propertyOptions['padding_margin']['margin_top'] = array(
 	'select_options' => $margin_lengths,
 	'sug_values' => array(
 		'this' => 1,
-
+		'root_cat' => 'spacing'
 	),
 	'rel' => 'margin',
 	'icon' => '7',
@@ -2511,7 +2522,7 @@ $propertyOptions['padding_margin']['margin_right'] = array(
 	'select_options' => $margin_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		// 'root_cat' => 'margin'
+		'root_cat' => 'spacing'
 	),
 	'rel' => 'margin',
 	'icon' => '6',
@@ -2549,7 +2560,7 @@ $propertyOptions['padding_margin']['margin_bottom'] = array(
 	'select_options' => $margin_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		// 'root_cat' => 'margin'
+		'root_cat' => 'spacing'
 	),
 	'icon' => '8',
 	// ref
@@ -2586,7 +2597,7 @@ $propertyOptions['padding_margin']['margin_left'] = array(
 	'select_options' => $margin_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		// 'root_cat' => 'margin'
+		'root_cat' => 'spacing'
 	),
 	'rel' => 'margin',
 	'icon' => '5',
@@ -2797,7 +2808,7 @@ $propertyOptions['border']['border_top_width'] = array(
 	'select_options' => $border_width_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		// 'root_cat' => 'border_width'
+		'root_cat' => 'border_width'
 	),
 	'rel' => 'border_width',
 	'icon' => '6, 14',
@@ -2834,7 +2845,7 @@ $propertyOptions['border']['border_right_width'] = array(
 	'select_options' => $border_width_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		// 'root_cat' => 'border_width'
+		'root_cat' => 'border_width'
 	),
 	'rel' => 'border_width',
 	'icon' => '9, 14',
@@ -2871,7 +2882,7 @@ $propertyOptions['border']['border_bottom_width'] = array(
 	'select_options' => $border_width_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		// 'root_cat' => 'border_width'
+		'root_cat' => 'border_width'
 	),
 	'rel' => 'border_width',
 	'icon' => '7, 14',
@@ -2908,7 +2919,7 @@ $propertyOptions['border']['border_left_width'] = array(
 	'select_options' => $border_width_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		// 'root_cat' => 'border_width'
+		'root_cat' => 'border_width'
 	),
 	'rel' => 'border_width',
 	'last_in_sub' => 1,
@@ -3114,7 +3125,7 @@ $propertyOptions['border']['border_top_left_radius'] = array(
 	'select_options' => $border_radius_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		// 'root_cat' => 'border_radius'
+		'root_cat' => 'border_radius'
 	),
 	'icon' => '17',
 	'rel' => 'border_radius',
@@ -3160,7 +3171,7 @@ $propertyOptions['border']['border_top_right_radius'] = array(
 	'select_options' => $border_radius_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		// 'root_cat' => 'border_radius'
+		'root_cat' => 'border_radius'
 	),
 	'icon' => '18',
 	'rel' => 'border_radius',
@@ -3191,7 +3202,7 @@ $propertyOptions['border']['border_bottom_right_radius'] = array(
 	'select_options' => $border_radius_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		// 'root_cat' => 'border_radius'
+		'root_cat' => 'border_radius'
 	),
 	'icon' => '20',
 	'rel' => 'border_radius',
@@ -3223,7 +3234,7 @@ $propertyOptions['border']['border_bottom_left_radius'] = array(
 	'select_options' => $border_radius_lengths,
 	'sug_values' => array(
 		'this' => 1,
-		// 'root_cat' => 'border_radius'
+		'root_cat' => 'border_radius'
 	),
 	'icon' => '19',
 	'rel' => 'border_radius',
@@ -3810,6 +3821,97 @@ $grid_lines = array(
 );
 $grid_lines_end = array_merge($grid_lines, array('-1', '-2'));
 
+$grid_tutorials = array(
+	array(
+		'url' => 'https://gridbyexample.com/video/',
+		'title' => 'Learn Grid Layout Video Series',
+	),
+	array(
+		'url' => 'https://learncssgrid.com/',
+		'title' => 'Learn CSS Grid',
+	),
+	array(
+		'url' => 'https://css-tricks.com/snippets/css/complete-guide-grid/',
+		'title' => 'A Complete Guide to Grid',
+	),
+);
+
+$grid_area = array(
+	'short_label' => esc_html_x('Grid area', 'noun', 'microthemer'),
+	'label' => esc_attr_x('Grid area', 'noun', 'microthemer'),
+	'sub_label' => esc_html__('Area', 'microthemer'),
+	'sub_slug' => 'itemarea',
+	'tab_control' => 'griditems',
+	'select_options' => $template_areas,
+	'sug_values' => array(
+		'this' => 1,
+	),
+	//'prefixes' => $flex_display_prefixes,
+	'icon' => '14, 8, B',
+	// ref
+	'ref_desc' => "<p>Assign a grid item to a named grid area. Or a shorthand to set grid-row-start, grid-column-start, grid-row-end and grid-column-end using forward slashes (/) to separate values.</p>",
+	'ref_links' => array(
+		'mozilla' => 'https://developer.mozilla.org/en-US/docs/Web/CSS/grid-area',
+		'quackit' => 'https://www.quackit.com/css/css3/properties/css_grid-area.cfm',
+		'w3s' => 'https://www.w3schools.com/cssref/pr_grid-area.asp',
+	),
+	'tutorials' => $grid_tutorials,
+	'group_tutorials' => 1
+);
+
+$grid_order = array(
+	'animatable' => 1,
+	'short_label' => esc_html_x('Order', 'noun', 'microthemer'),
+	'label' => esc_attr_x('Order (grid)', 'noun', 'microthemer'),
+	'sub_label' => esc_html__('Other', 'microthemer'),
+	'sub_slug' => 'itemother',
+	'tab_control' => 'griditems',
+	'icon' => '11, 1, B',
+	'select_options' => $flex_grow_shrink_order,
+	'sug_values' => array(
+		'this' => 1,
+		'root_cat' => 'order'
+	),
+	// ref
+	'ref_desc' => "<p>Specifies the order of a grid item relative to other items. The default value for this property is 0, which means '-1' must be used to place an item first.</p>",
+	'ref_values' => array(
+		"(unitless number)" => "E.g. -1, 1, 2, 3 etc",
+	),
+	'ref_links' => array(
+		'mozilla' => 'https://developer.mozilla.org/en-US/docs/Web/CSS/order',
+		'quackit' => 'https://www.quackit.com/css/css3/properties/css_order.cfm',
+		'w3s' => 'https://www.w3schools.com/cssref/css3_pr_order.asp',
+	),
+	'tutorials' => $grid_tutorials,
+	'group_tutorials' => 1
+);
+
+$grid_z_index = array(
+	'short_label' => esc_html_x('Z-index', 'noun', 'microthemer'),
+	'label' => esc_attr_x('Z-index (grid)', 'noun', 'microthemer'),
+
+	'tab_control' => 'griditems',
+	'select_options' => $z_index,
+	'sug_values' => array(
+		'this' => 1,
+		'root_cat' => 'z_index'
+	),
+	//'prefixes' => $flex_display_prefixes,
+	'icon' => '10, 1, B',
+	// ref
+	'ref_desc' => "<p>Specifies the stack order of an element. An element with greater stack order is always in front of an element with a lower stack order.</p>",
+	'ref_values' => array(
+		"(unitless number)" => "E.g. -1, 1, 2, 3 etc",
+	),
+	'ref_links' => array(
+		'mozilla' => 'https://developer.mozilla.org/en-US/docs/Web/CSS/z-index',
+		'quackit' => 'http://www.quackit.com/css/properties/css_z-index.cfm',
+		'w3s' => 'http://www.w3schools.com/cssref/pr_pos_z-index.asp',
+	),
+	'tutorials' => $grid_tutorials,
+	'group_tutorials' => 1
+);
+
 // general
 
 // duplicate display property so display:flex can be set more easily
@@ -3883,7 +3985,7 @@ $propertyOptions['grid']['grid_auto_flow'] = array(
 		'quackit' => 'https://www.quackit.com/css/css3/properties/css_grid-auto-flow.cfm',
 		'w3s' => 'https://www.w3schools.com/cssref/pr_grid-auto-flow.asp',
 	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
+	'tutorials' => $grid_tutorials,
 	'group_tutorials' => 1
 );
 
@@ -3904,6 +4006,10 @@ $propertyOptions['grid']['column_gap'] = array(
 	//'type' => 'combobox',
 	'default_unit' => 1,
 	'select_options' => $gap_sizes,
+	'sug_values' => array(
+		'this' => 1,
+		'root_cat' => 'spacing'
+	),
 	'prefixes' => array(
 		'property' => array(
 			'grid-column-gap',
@@ -3917,7 +4023,7 @@ $propertyOptions['grid']['column_gap'] = array(
 		'quackit' => 'https://www.quackit.com/css/css3/properties/css_grid-column-gap.cfm',
 		'w3s' => 'https://www.w3schools.com/cssref/pr_grid-column-gap.asp',
 	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
+	'tutorials' => $grid_tutorials,
 	'group_tutorials' => 1
 );
 
@@ -3933,6 +4039,10 @@ $propertyOptions['grid']['row_gap'] = array(
 	//'type' => 'combobox',
 	'default_unit' => 1,
 	'select_options' => $gap_sizes,
+	'sug_values' => array(
+		'this' => 1,
+		'root_cat' => 'spacing'
+	),
 	'prefixes' => array(
 		'property' => array(
 			'grid-row-gap',
@@ -3946,7 +4056,7 @@ $propertyOptions['grid']['row_gap'] = array(
 		'quackit' => 'https://www.quackit.com/css/css3/properties/css_grid-row-gap.cfm',
 		'w3s' => 'https://www.w3schools.com/cssref/pr_grid-row-gap.asp',
 	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
+	'tutorials' => $grid_tutorials,
 	'group_tutorials' => 1
 );
 
@@ -3984,7 +4094,7 @@ $propertyOptions['grid']['grid_template_columns'] = array(
 		'quackit' => 'https://www.quackit.com/css/css3/properties/css_grid-template-columns.cfm',
 		'w3s' => 'https://www.w3schools.com/cssref/pr_grid-template-columns.asp',
 	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
+	'tutorials' => $grid_tutorials,
 	'group_tutorials' => 1
 );
 
@@ -4020,7 +4130,7 @@ $propertyOptions['grid']['grid_template_rows'] = array(
 		'quackit' => 'https://www.quackit.com/css/css3/properties/css_grid-template-rows.cfm',
 		'w3s' => 'https://www.w3schools.com/cssref/pr_grid-template-rows.asp',
 	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
+	'tutorials' => $grid_tutorials,
 	'group_tutorials' => 1
 );
 
@@ -4056,7 +4166,7 @@ generated when content flows outside of the <i>explicitly</i> defined grid-templ
 		'quackit' => 'https://www.quackit.com/css/css3/properties/css_grid-auto-columns.cfm',
 		'w3s' => 'https://www.w3schools.com/cssref/pr_grid-auto-columns.asp',
 	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
+	'tutorials' => $grid_tutorials,
 	'group_tutorials' => 1
 );
 
@@ -4090,7 +4200,7 @@ generated when content flows outside of the <i>explicitly</i> defined grid-templ
 		'quackit' => 'https://www.quackit.com/css/css3/properties/css_grid-auto-rows.cfm',
 		'w3s' => 'https://www.w3schools.com/cssref/pr_grid-auto-rows.asp',
 	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
+	'tutorials' => $grid_tutorials,
 	'group_tutorials' => 1
 );
 
@@ -4120,7 +4230,7 @@ $propertyOptions['grid']['justify_items_grid'] = array(
 		'mozilla' => 'https://developer.mozilla.org/en-US/docs/Web/CSS/justify-items',
 		'quackit' => 'https://www.quackit.com/css/css3/properties/css_justify-items.cfm',
 	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
+	'tutorials' => $grid_tutorials,
 	'group_tutorials' => 1
 );
 
@@ -4148,7 +4258,7 @@ $propertyOptions['grid']['justify_content_grid'] = array(
 		'quackit' => 'https://www.quackit.com/css/css3/properties/css_justify-content.cfm',
 		'w3s' => 'https://www.w3schools.com/cssref/css3_pr_justify-content.asp',
 	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
+	'tutorials' => $grid_tutorials,
 	'group_tutorials' => 1
 );
 
@@ -4178,7 +4288,7 @@ $propertyOptions['grid']['align_items_grid'] = array(
 		'quackit' => 'https://www.quackit.com/css/css3/properties/css_align-items.cfm',
 		'w3s' => 'https://www.w3schools.com/cssref/css3_pr_align-items.asp',
 	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
+	'tutorials' => $grid_tutorials,
 	'group_tutorials' => 1
 );
 
@@ -4208,7 +4318,7 @@ $propertyOptions['grid']['align_content_grid'] = array(
 		'quackit' => 'https://www.quackit.com/css/css3/properties/css_align-content.cfm',
 		'w3s' => 'https://www.w3schools.com/cssref/css3_pr_align-content.asp',
 	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
+	'tutorials' => $grid_tutorials,
 	'group_tutorials' => 1
 );
 
@@ -4243,7 +4353,7 @@ $propertyOptions['grid']['grid_template_areas'] = array(
 		'quackit' => 'https://www.quackit.com/css/css3/properties/css_grid-template-areas.cfm',
 		'w3s' => 'https://www.w3schools.com/cssref/pr_grid-template-areas.asp',
 	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
+	'tutorials' => $grid_tutorials,
 	'group_tutorials' => 1
 );
 
@@ -4264,6 +4374,138 @@ $propertyOptions['grid']['grid_template_areas_add'] = array(
 	)
 );
 
+// all items - for overriding flexbox or float layouts easily
+
+$width_height_reset = array(
+	'auto',
+	'100%'
+);
+
+// grid_width
+$propertyOptions['grid']['width_gridall'] = array(
+	'short_label' => $propertyOptions['dimensions']['width']['short_label'],
+	'label' => esc_html__('Width (all grid items)',  'microthemer'),
+	'sub_label' => esc_html__('Size', 'microthemer'),
+	'sub_slug' => 'allitemssize',
+	'tab_control' => 'allgriditems',
+	'type' => 'combobox',
+	'auto' => $propertyOptions['dimensions']['width']['auto'],
+	'default_unit' => 1,
+	'select_options' => $width_height_reset,
+	'icon' => '9',
+	// ref
+	'ref_desc' => "<p>Set the width property of all grid items. Setting a value of '100%' or 'auto' makes grid items fill the full width of the grid tracks you define using grid-template-columns. This is useful when converting existing flexbox or float layouts to grid.</p>",
+	'ref_links' => $propertyOptions['dimensions']['width']['ref_links'],
+	'tutorials' => $grid_tutorials,
+	'group_tutorials' => 1
+);
+
+// grid_height
+$propertyOptions['grid']['height_gridall'] = array(
+	'short_label' => $propertyOptions['dimensions']['height']['short_label'],
+	'label' => esc_html__('height (all grid items)', 'microthemer'),
+	'tab_control' => 'allgriditems',
+	'type' => 'combobox',
+	'auto' => $propertyOptions['dimensions']['height']['auto'],
+	'default_unit' => 1,
+	'select_options' => $width_height_reset,
+	'icon' => '10',
+	// ref
+	'ref_desc' => "<p>Set the height property of all grid items. Setting a value of '100%' or 'auto' makes grid items fill the full height of the grid tracks you define using grid-template-rows.</p>",
+	'ref_links' => $propertyOptions['dimensions']['height']['ref_links'],
+	'tutorials' => $grid_tutorials,
+	'group_tutorials' => 1
+);
+
+// grid padding - note there is no other padding property so no _grid suffix (otherwise we get issues)
+$propertyOptions['grid']['padding'] = array(
+	'short_label' => $propertyOptions['padding_margin']['padding_top']['sub_label'],
+	'label' => esc_html__('Padding (all grid items)',  'microthemer'),
+	'sub_label' => esc_html__('Spacing', 'microthemer'),
+	'sub_slug' => 'allitemsspacing',
+	'tab_control' => 'allgriditems',
+	//'type' => 'combobox',
+	'auto' => $propertyOptions['padding_margin']['padding_top']['auto'],
+	'default_unit' => 1,
+	'select_options' => $padding_lengths,
+	'sug_values' => array(
+		'this' => 1,
+		'root_cat' => 'spacing'
+	),
+	'icon' => $propertyOptions['padding_margin']['padding_top']['icon'],
+	// ref
+	'ref_desc' => "<p>Set the padding shorthand property for all grid items.</p>",
+	'ref_links' => $propertyOptions['padding_margin']['padding_top']['ref_links'],
+	'tutorials' => $grid_tutorials,
+	'group_tutorials' => 1
+);
+
+// grid margin - note there is no other margin property so no _grid suffix (otherwise we get issues)
+$propertyOptions['grid']['margin'] = array(
+	'short_label' => $propertyOptions['padding_margin']['margin_top']['sub_label'],
+	'label' => esc_html__('Margin (all grid items)',  'microthemer'),
+	'tab_control' => 'allgriditems',
+	//'type' => 'combobox',
+	'auto' => $propertyOptions['padding_margin']['margin_top']['auto'],
+	'default_unit' => 1,
+	'select_options' => $margin_lengths,
+	'sug_values' => array(
+		'this' => 1,
+		'root_cat' => 'spacing'
+	),
+	'icon' => $propertyOptions['padding_margin']['margin_top']['icon'],
+	// ref
+	'ref_desc' => "<p>Set the margin shorthand property for all grid items. Setting this to zero may sometimes be necessary when converting float layouts to grid, as float layouts typically create column and row gaps using margin.</p>",
+	'ref_links' => $propertyOptions['padding_margin']['padding_top']['ref_links'],
+	'tutorials' => $grid_tutorials,
+	'group_tutorials' => 1
+);
+
+$propertyOptions['grid']['grid_area_gridall'] = array(
+	'short_label' => $grid_area['short_label'],
+	'label' => esc_html__('Grid area (all grid items)',  'microthemer'),
+	'sub_label' => $grid_area['sub_label'],
+	'sub_slug' => 'allitemsarea',
+	'tab_control' => 'allgriditems',
+	'type' => 'combobox',
+	'select_options' => array('auto'),
+	'icon' => '14, 8, B',
+	// ref
+	'ref_desc' => "<p>Reset the grid-area of all grid items to 'auto'. This is useful for resetting grid positions on mobile.</p>",
+	'ref_links' => $grid_area['ref_links'],
+	'tutorials' => $grid_tutorials,
+	'group_tutorials' => 1
+);
+
+$propertyOptions['grid']['order_gridall'] = array(
+	'short_label' => $grid_order['short_label'],
+	'label' => esc_html__('Order (all grid items)',  'microthemer'),
+	'sub_label' => $grid_order['sub_label'],
+	'sub_slug' => 'allitemsother',
+	'tab_control' => 'allgriditems',
+	//'type' => 'combobox',
+	'select_options' => array('0'),
+	'icon' => $grid_order['icon'],
+	// ref
+	'ref_desc' => "<p>Reset the order of all grid items to '0'. This is useful for resetting the grid on mobile.</p>",
+	'ref_links' => $grid_order['ref_links'],
+	'tutorials' => $grid_tutorials,
+	'group_tutorials' => 1
+);
+
+$propertyOptions['grid']['z_index_gridall'] =  array(
+	'short_label' => $grid_z_index['short_label'],
+	'label' => esc_html__('Z-index (all grid items)',  'microthemer'),
+	'tab_control' => 'allgriditems',
+	//'type' => 'combobox',
+	'select_options' => array('auto'),
+	'icon' => $grid_z_index['icon'],
+	// ref
+	'ref_desc' => "<p>Reset the z-index of all grid items to 'auto'. This is useful for resetting the grid on mobile.</p>",
+	'ref_links' => $grid_z_index['ref_links'],
+	'tutorials' => $grid_tutorials,
+	'group_tutorials' => 1
+);;
 
 // item
 
@@ -4293,7 +4535,7 @@ $propertyOptions['grid']['grid_column_start'] = array(
 		'quackit' => 'https://www.quackit.com/css/css3/properties/css_grid-column-start.cfm',
 		'w3s' => 'https://www.w3schools.com/cssref/pr_grid-column-start.asp',
 	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
+	'tutorials' => $grid_tutorials,
 	'group_tutorials' => 1
 );
 
@@ -4320,7 +4562,7 @@ $propertyOptions['grid']['grid_column_end'] = array(
 		'quackit' => 'https://www.quackit.com/css/css3/properties/css_grid-column-end.cfm',
 		'w3s' => 'https://www.w3schools.com/cssref/pr_grid-column-end.asp',
 	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
+	'tutorials' => $grid_tutorials,
 	'group_tutorials' => 1
 );
 
@@ -4341,6 +4583,7 @@ $propertyOptions['grid']['grid_row_start'] = array(
 		'gridauto' => esc_html__('Auto', 'microthemer'),
 		'gridalign' => esc_html__('Align', 'microthemer'),
 		'gridareas' => esc_html__('Areas', 'microthemer'),
+		'allgriditems' => esc_html__('All', 'microthemer'),
 		'griditems' => esc_html__('Item', 'microthemer')
 		    . '<span class="mt-tab-txt grid-tab-txt grid-item-num"></span>',
 
@@ -4359,7 +4602,7 @@ $propertyOptions['grid']['grid_row_start'] = array(
 		'quackit' => 'https://www.quackit.com/css/css3/properties/css_grid-row-start.cfm',
 		'w3s' => 'https://www.w3schools.com/cssref/pr_grid-row-start.asp',
 	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
+	'tutorials' => $grid_tutorials,
 	'group_tutorials' => 1
 );
 
@@ -4386,7 +4629,7 @@ $propertyOptions['grid']['grid_row_end'] = array(
 		'quackit' => 'https://www.quackit.com/css/css3/properties/css_grid-row-end.cfm',
 		'w3s' => 'https://www.w3schools.com/cssref/pr_grid-row-end.asp',
 	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
+	'tutorials' => $grid_tutorials,
 	'group_tutorials' => 1
 );
 
@@ -4412,7 +4655,7 @@ $propertyOptions['grid']['justify_self'] = array(
 		'mozilla' => 'https://developer.mozilla.org/en-US/docs/Web/CSS/justify-self',
 		'quackit' => 'https://www.quackit.com/css/css3/properties/css_justify-self.cfm',
 	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
+	'tutorials' => $grid_tutorials,
 	'group_tutorials' => 1
 );
 
@@ -4435,88 +4678,20 @@ $propertyOptions['grid']['align_self_grid'] = array(
 		'quackit' => 'https://www.quackit.com/css/css3/properties/css_align-self.cfm',
 		'w3s' => 'https://www.w3schools.com/cssref/css3_pr_align-self.asp',
 	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
+	'tutorials' => $grid_tutorials,
 	'group_tutorials' => 1
 );
 
 // grid-area
-$propertyOptions['grid']['grid_area'] = array(
-	'short_label' => esc_html_x('Grid area', 'noun', 'microthemer'),
-	'label' => esc_attr_x('Grid area', 'noun', 'microthemer'),
-	'sub_label' => esc_html__('Area', 'microthemer'),
-	'sub_slug' => 'itemarea',
-	'tab_control' => 'griditems',
-	'select_options' => $template_areas,
-	'sug_values' => array(
-		'this' => 1,
-	),
-	//'prefixes' => $flex_display_prefixes,
-	'icon' => '14, 8, B',
-	// ref
-	'ref_desc' => "<p>Assign a grid item to a named grid area. Or a shorthand to set grid-row-start, grid-column-start, grid-row-end and grid-column-end using forward slashes (/) to separate values.</p>",
-	'ref_links' => array(
-		'mozilla' => 'https://developer.mozilla.org/en-US/docs/Web/CSS/grid-area',
-		'quackit' => 'https://www.quackit.com/css/css3/properties/css_grid-area.cfm',
-		'w3s' => 'https://www.w3schools.com/cssref/pr_grid-area.asp',
-	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
-	'group_tutorials' => 1
-);
+$propertyOptions['grid']['grid_area'] = $grid_area;
 
 // item other
 
 // order (grid)
-$propertyOptions['grid']['order_grid'] = array(
-	'animatable' => 1,
-	'short_label' => esc_html_x('Order', 'noun', 'microthemer'),
-	'label' => esc_attr_x('Order (grid)', 'noun', 'microthemer'),
-	'sub_label' => esc_html__('Other', 'microthemer'),
-	'sub_slug' => 'itemother',
-	'tab_control' => 'griditems',
-	'icon' => '11, 1, B',
-	'select_options' => $flex_grow_shrink_order,
-	'sug_values' => array(
-		'this' => 1,
-	),
-	// ref
-	'ref_desc' => "<p>Specifies the order of a grid item relative to other items. The default value for this property is 0, which means '-1' must be used to place an item first.</p>",
-	'ref_values' => array(
-		"(unitless number)" => "E.g. -1, 1, 2, 3 etc",
-	),
-	'ref_links' => array(
-		'mozilla' => 'https://developer.mozilla.org/en-US/docs/Web/CSS/order',
-		'quackit' => 'https://www.quackit.com/css/css3/properties/css_order.cfm',
-		'w3s' => 'https://www.w3schools.com/cssref/css3_pr_order.asp',
-	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
-	'group_tutorials' => 1
-);
+$propertyOptions['grid']['order_grid'] = $grid_order;
 
 // grid z-index
-$propertyOptions['grid']['z_index_grid'] = array(
-	'short_label' => esc_html_x('Z-index', 'noun', 'microthemer'),
-	'label' => esc_attr_x('Z-index (grid)', 'noun', 'microthemer'),
-
-	'tab_control' => 'griditems',
-	'select_options' => $z_index,
-	'sug_values' => array(
-		'this' => 1,
-	),
-	//'prefixes' => $flex_display_prefixes,
-	'icon' => '10, 1, B',
-	// ref
-	'ref_desc' => "<p>Specifies the stack order of an element. An element with greater stack order is always in front of an element with a lower stack order.</p>",
-	'ref_values' => array(
-		"(unitless number)" => "E.g. -1, 1, 2, 3 etc",
-	),
-	'ref_links' => array(
-		'mozilla' => 'https://developer.mozilla.org/en-US/docs/Web/CSS/z-index',
-		'quackit' => 'http://www.quackit.com/css/properties/css_z-index.cfm',
-		'w3s' => 'http://www.w3schools.com/cssref/pr_pos_z-index.asp',
-	),
-	'tutorials' => $propertyOptions['grid']['display_grid']['tutorials'],
-	'group_tutorials' => 1
-);
+$propertyOptions['grid']['z_index_grid'] = $grid_z_index;
 
 
 // position
@@ -4933,7 +5108,7 @@ $propertyOptions['animation']['animation_duration'] = array(
 	'sug_values' => array(
 		'this' => 1,
 		//'forceSug' => 1
-		// 'root_cat' => 'time'
+		'root_cat' => 'time'
 	),
 	'prefixes' => array(
 		'property' => array(
@@ -4968,7 +5143,7 @@ $propertyOptions['animation']['animation_timing_function'] = array(
 	'sug_values' => array(
 		'this' => 1,
 		//'forceSug' => 1
-		// 'root_cat' => 'timing_function'
+		'root_cat' => 'timing_function'
 	),
 	//'type' => 'combobox',
 	'select_options' => array(
@@ -5050,7 +5225,7 @@ $propertyOptions['animation']['animation_delay'] = array(
 	'sug_values' => array(
 		'this' => 1,
 		//'forceSug' => 1
-		// 'root_cat' => 'time'
+		'root_cat' => 'time'
 	),
 
 	'prefixes' => array(
@@ -5366,7 +5541,7 @@ $propertyOptions['transition']['transition_duration'] = array(
 	'sug_values' => array(
 		'this' => 1,
 		//'forceSug' => 1
-		// 'root_cat' => 'time'
+		'root_cat' => 'time'
 	),
 	'prefixes' => array(
 		'property' => array(
@@ -5403,7 +5578,7 @@ $propertyOptions['transition']['transition_timing_function'] = array(
 	'sug_values' => array(
 		'this' => 1,
 		//'forceSug' => 1
-		// 'root_cat' => 'timing_function'
+		'root_cat' => 'timing_function'
 	),
 	//'type' => 'combobox',
 	'select_options' => $propertyOptions['animation']['animation_timing_function']['select_options'],
@@ -5450,7 +5625,7 @@ $propertyOptions['transition']['transition_delay'] = array(
 	'sug_values' => array(
 		'this' => 1,
 		//'forceSug' => 1
-		// 'root_cat' => 'time'
+		'root_cat' => 'time'
 	),
 	'prefixes' => array(
 		'property' => array(

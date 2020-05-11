@@ -20,21 +20,28 @@ $TvrLang = array(
 	'medium' => esc_html__('medium', 'microthemer'),
 	'wide' => esc_html__('wide', 'microthemer'),
 
+	'recent' => esc_html__('Recent', 'microthemer'),
 	'suggestions' => esc_html__('Suggestions', 'microthemer'),
 	'add_mt_suggestions' => esc_html__('Add MT suggestions', 'microthemer'), // (hold shift for all properties)
 	'clear_mt_suggestions' => esc_html__('Clear MT suggestions (keeps recent & saved)', 'microthemer'),
 	'clear_single_suggestion' => esc_html__('Clear suggestion', 'microthemer'),
 	'save_single_suggestion' => esc_html__('Save suggestion', 'microthemer'),
 	'unsave_single_suggestion' => esc_html__('Un-save suggestion', 'microthemer'),
-	'sampled' => esc_html__('Site styles', 'microthemer'),
-	'clear_sampled' => esc_html__("Clear %s site styles", 'microthemer'),
-	'resample' => esc_html__("Sample %s styles from the page", 'microthemer'), //
+	'sampled' => esc_html__('Sampled values', 'microthemer'),
+	'sampled_variables' => esc_html__('Site variables', 'microthemer'),
+	'clear_sampled' => esc_html__("Clear sampled %s values", 'microthemer'),
+	'clear_sampled_variables' => esc_html__("Clear sampled %s variables", 'microthemer'),
+	'resample' => esc_html__("Resample %s values from the page", 'microthemer'), //
+	'resample_variables' => esc_html__("Resample variables from the page", 'microthemer'),
 
 	'multi_tab_short' => esc_html__('Multiple tabs/users issue', 'microthemer'),
 	'multi_tab_long' => esc_html__('MT settings were updated more recently by another user or browser tab. Saving from this outdated tab could cause data loss. Please reload the page instead of saving from this tab (to get the latest changes).',  'microthemer'),
 
 	'inline_animation_short' => esc_html__('Animation fails with display:inline', 'microthemer'),
 	'inline_animation_long' => esc_html__('Microthemer\'s animate.css animations do not always work well when elements have a display value of inline. To fix, go to the Behaviour property group and set the Display property to e.g. inline-block', 'microthemer'),
+
+	'notify_folder_limit_short' => esc_html__('Max selectors per folder reached (%s)', 'microthemer'),
+	'notify_folder_limit_long' => esc_html__('Your last selector was added to an auto-generated folder (%s) because your "%s" folder reached the limit of 40 selectors.', 'microthemer'),
 
 	'learn_more' => esc_html__('Learn more', 'microthemer'),
 	'slow_styles_tab' => esc_html__('Styles tab slows the browser: %1$s sec (avg)', 'microthemer'),
@@ -121,17 +128,21 @@ $TvrLang = array(
 	'load_revisions_table_failed' => esc_html__('Revisions failed to load', 'microthemer'),
 	'retrieve_css' => esc_html__('Retrieving CSS', 'microthemer'),
 	'retrieve_css_failed' => esc_html__('CSS failed to load', 'microthemer'),
+	'remove_builder_edit_lock' => esc_html__('Removing %s edit lock', 'microthemer'),
+	'remove_builder_edit_lock_failed' => esc_html__('%s edit lock could not be removed', 'microthemer'),
 	'loading_sass_import' => esc_html__('Fetching SCSS import', 'microthemer'),
 	'loading_sass_import_failed' => esc_html__('SCSS import failed to load', 'microthemer'),
 	'scss_error' => esc_html__('SCSS error - compilation failed', 'microthemer'),
 	'scss_error_long' => esc_html__('An error in your SCSS code prevented it from being compiled to CSS', 'microthemer'),
 	'scss_error_line' => esc_html__('View the error line (Ctrl + Alt + G)', 'microthemer'),
 	'compile_scss' => esc_html__('Compiling SCSS', 'microthemer'),
+	'color_var_label' => esc_html__('Enter variable', 'microthemer'),
 	'save_fonts' => esc_html__('Saving font settings', 'microthemer'),
 	'save_fonts_failed' => esc_html__('Font settings failed to save', 'microthemer'),
 	'load_script' => esc_html__('Loading Javascript', 'microthemer'),
 	'load_script_failed' => esc_html__('Script failed to load', 'microthemer'),
 	'load_script_failed_p' => esc_html__('The %s failed to load.', 'microthemer'),
+	'delete_folder_confirm' => esc_html__('Are you sure you want to delete your "%s" folder?', 'microthemer'),
 	'reset_settings_confirm' => esc_html__('Are you sure you want to reset all settings?', 'microthemer'),
 	'reset_empty_folders' => esc_html__('Resetting empty folders', 'microthemer'),
 	'clear_styles_confirm' => esc_html__('Are you sure you want to clear all styles?', 'microthemer'),

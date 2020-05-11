@@ -35,6 +35,9 @@ $data.= 'TvrMT.data.prog.combo.viewed_import_stylesheets = ' . json_encode($this
 // user's current media queries (combined with All Devices)
 $data.= 'var TvrMQsCombined = ' . json_encode($this->combined_devices()) . ';' . "\n\n";
 
+// available builder integrations
+$data.= 'TvrMT.data.dyn.integrations = ' . json_encode($this->integrations) . ';' . "\n\n";
+
 // the full ui options in JS form. Later, this will be used for speed optimisations
 $data.= 'TvrMT.data.dyn.builder_breakpoints = ' . json_encode(
 	array(
@@ -79,7 +82,14 @@ if ($this->client_scss()){
 // the micro-themes dir and url paths
 $data.= 'TvrMT.data.dyn.micro_root_url = "' . $this->micro_root_url . '";' . "\n\n";
 
+// the default site pages list (posts and pages limited to 30, more results collected on search)
+$data.= 'TvrMT.data.dyn.site_pages = ' . json_encode($this->get_site_pages()) . ';' . "\n\n";
+
 // dynamic menus: enq_js, mqs, custom code, animation, preset
+
+$data.= 'TvrMT.data.dyn.ui_config = ' . json_encode(array(
+	'mt_nonlog_nonce' => wp_create_nonce('mt_nonlog_check') // note this won't work with browser sync enabled
+)) . ';' . "\n\n";
 
 
 // output JS

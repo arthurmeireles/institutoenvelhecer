@@ -113,12 +113,23 @@ $this->preferences['dock_editor_left'] ? $ui_class.= ' dock_editor_left' : false
 $this->preferences['dock_options_left'] ? $ui_class.= ' dock_options_left' : false;
 $this->preferences['detach_preview'] ? $ui_class.= ' detach_preview' : false;
 !empty($this->preferences['server_scss']) ? $ui_class.= ' server_scss' : false;
+!empty($this->preferences['show_sampled_values']) ? $ui_class.= ' show_sampled_values' : false;
+!empty($this->preferences['show_sampled_variables']) ? $ui_class.= ' show_sampled_variables' : false;
 
 // signal if 3rd party plugins are active
+$no_integrations_available = true;
 foreach ($this->integrations as $intKey => $val){
 	if (!empty($val)){
 		$ui_class.= ' ' . $intKey.'_active';
+		$no_integrations_available = false;
 	}
+}
+
+// signal that some integrations are available for e.g. launch builder checkbox
+if ($no_integrations_available){
+	$ui_class.= ' no_integrations_available';
+} else {
+	$ui_class.= ' integrations_available';
 }
 
 // page specific class is added if at least one option is on
@@ -154,6 +165,22 @@ if ($this->edge_mode['active']){
 		<?php
 		// root ui toggle for showing/hiding extra action icons in folders and selectors menu
 		echo $this->extra_actions_icon('show_extra_actions');
+
+		// root toggle for showing variables
+        $sampledTypes = array('variables', 'values');
+        foreach ($sampledTypes as $sType){
+            $sKey = 'show_sampled_'.$sType;
+	        echo $this->ui_toggle(
+		        $sKey,
+		        esc_attr__('Expand variables', 'microthemer'),
+		        esc_attr__('Collapse variables', 'microthemer'),
+		        !empty($this->preferences[$sKey]),
+		        'sampled-'.$sType.'-toggle tvr-icon',
+		        $sKey
+	        );
+        }
+
+
 		/*echo $this->ui_toggle(
 			'show_extra_actions',
 			esc_attr__('Show more actions', 'microthemer'),
@@ -626,7 +653,26 @@ if ($this->edge_mode['active']){
 						?>">
 
 							<div class="heading">
-								<span class="text"><?php esc_html_e('Targeting suggestions', 'microthemer'); ?></span>
+
+                                <span class="text"><?php esc_html_e('Targeting suggestions', 'microthemer'); ?></span>
+
+                                <?php
+                                $specificity_high = !empty($this->preferences['specificity_preference']) ? ' on' : '';
+                                ?>
+                                <div class="ui-toggle uit-par specificity-preference<?php echo $specificity_high; ?>" data-aspect="specificity_preference">
+                                    <span class="specificity-label"
+                                          title=" <?php esc_attr_e('Sort by specificity', 'microthemer'); ?>">
+                                        <?php esc_html_e('Specificity', 'microthemer'); ?>:
+                                    </span>
+                                    <span class="specificity-low ui-toggle"
+                                          title=" <?php esc_attr_e('favour classes', 'microthemer'); ?>">
+                                        <?php esc_html_e('low', 'microthemer'); ?>
+                                    </span>
+                                    <span class="specificity-high ui-toggle"
+                                          title=" <?php esc_attr_e('favour ids', 'microthemer'); ?>">
+                                        <?php esc_html_e('high', 'microthemer'); ?>
+                                    </span>
+                                </div>
 							</div>
 
 

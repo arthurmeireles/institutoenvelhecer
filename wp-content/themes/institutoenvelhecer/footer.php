@@ -1,4 +1,4 @@
-<div class="footer-dark">
+<div class="footer-dark"  onload="adicionaClasse()">
     <footer>
         <div class="container">
 

@@ -8,9 +8,9 @@ function institutoenvelhecer_wp_styles() {
     wp_enqueue_style( 'style_css', get_stylesheet_uri() );
 
 // MEUS ARQUIVOS DE CSS
+
     wp_enqueue_style( 'main_css', get_stylesheet_directory_uri().'/assets/css/style.css' );
     wp_enqueue_style( 'bootstrap_min_css', get_stylesheet_directory_uri().'/assets/bootstrap/css/bootstrap.min.css' );
-
     wp_enqueue_style( 'font_awesome_min_css', get_stylesheet_directory_uri().'/assets/fonts/font-awesome.min.css' );
     wp_enqueue_style( 'ionicons_min_css', get_stylesheet_directory_uri().'/assets/fonts/ionicons.min.css' );
     wp_enqueue_style( 'Team_Rotating_Cards_BS4_css', get_stylesheet_directory_uri().'/assets/css/-Team-Rotating-Cards-BS4-.css' );
@@ -45,13 +45,15 @@ function institutoenvelhecer_wp_styles() {
     wp_enqueue_style( 'Website-Wrapper_css', get_stylesheet_directory_uri().'/assets/css/Website-Wrapper.css' );
 
 //    MEUS ARQUIVOS DE JS
-//    wp_enqueue_script('jquery', get_template_directory_uri().'/assets/js/jquery.min.js', array(), '', false);
+    wp_enqueue_script('jquery', get_template_directory_uri().'/assets/js/jquery.min.js', array(), '', false);
 
     wp_enqueue_script('bootstrap_min_js', get_template_directory_uri().'/assets/bootstrap/js/bootstrap.min.js', array('jquery'), '', true);
     wp_enqueue_script('bs_init_js', get_template_directory_uri().'/assets/js/bs-init.js', array('jquery'), '', true);
     wp_enqueue_script('clean_blog_js', get_template_directory_uri().'/assets/js/clean-blog.js', array('jquery'), '', true);
-    wp_enqueue_script('navbar_apple_js', get_template_directory_uri('jquery').'/assets/js/Navbar---Apple.js', array(), '', true);
-    wp_enqueue_script('paralax_box_js', get_template_directory_uri('jquery').'/assets/js/Paralax-Box.js', array(), '', true);
+    wp_enqueue_script('navbar_apple_js', get_template_directory_uri('jquery').'/assets/js/Navbar---Apple.js', array('jquery'), '', true);
+    wp_enqueue_script('paralax_box_js', get_template_directory_uri('jquery').'/assets/js/Paralax-Box.js', array('jquery'), '', true);
+    wp_enqueue_script('meusEventos_js', get_template_directory_uri('jquery').'/assets/js/meusEventos.js', array('jquery'), '', true);
+
 
 }
 
@@ -60,4 +62,13 @@ function institutoenvelhecer_wp_styles() {
     add_theme_support( 'post-thumbnails' );
     add_theme_support('title-tag');
     add_filter ("widget_text", "do_shortcode");
+
+
+
+
+
+//    TESTANDO POST CUSTOMIZADO
+
+
+
 ?>

@@ -519,7 +519,9 @@ $field_wrap_html = '<div id="opts-'.$section_name.'-'.$css_selector.'-'.$propert
 		$html.= $variable_line ? '<div class="mt-variable-line">
 		<div class="mt-vl-inner">' : '';
 
-		$html.= '<span class="tvr-input-wrap '.$man_class . '">';
+		$input_wrap_html = '';
+
+		$input_wrap_html.= '<span class="tvr-input-wrap '.$man_class . '">';
 
 			// if a variable input field, provide a color picker too
 			if ($property === 'event_value'){
@@ -528,7 +530,7 @@ $field_wrap_html = '<div id="opts-'.$section_name.'-'.$css_selector.'-'.$propert
 					strpos($property_group_array['transition_property'], 'shadow') !== false) ? '' : 'hidden';
 				$picker_value = $hidden_suppl ? '' : $value;
 
-				$html.= '<span class="suppl-picker-wrap '.$hidden_suppl.'">
+				$input_wrap_html.= '<span class="suppl-picker-wrap '.$hidden_suppl.'">
 				<input class="color mt-supplementary-picker mt-color-picker" name="mt_sup_picker" value="'.$picker_value.'" />
 				</span>';
 			}
@@ -565,7 +567,7 @@ $field_wrap_html = '<div id="opts-'.$section_name.'-'.$css_selector.'-'.$propert
 				$pre_line = '';
 				$post_line = '';
 
-				$html.= '<div class="vl-item vl-line-name vl-pre-line-name" data-input-filter="vl-pre-line-name">'.
+				$input_wrap_html.= '<div class="vl-item vl-line-name vl-pre-line-name" data-input-filter="vl-pre-line-name">'.
 						 $line_input. $line_label . $combo_arrow .
 				        '</div>'.
 
@@ -580,21 +582,28 @@ $field_wrap_html = '<div id="opts-'.$section_name.'-'.$css_selector.'-'.$propert
 
 			else {
 				// render combobox // data-appto=".styling-options"
-				$html.= $property_input . $combo_arrow;
+				$input_wrap_html.= $property_input . $combo_arrow;
 			}
 
 
 
-			$html.= $extra_icon;
+			$input_wrap_html.= $extra_icon;
 
 
 
-			$html.= '<span class="'.$comp_class.'"></span>';
+			$input_wrap_html.= '<span class="'.$comp_class.'"></span>';
 
 
 
-		$html.= '</span>'; // end input wrap
+			$input_wrap_html.= '</span>'; // end input wrap
 
+
+		$html.= $input_wrap_html;
+
+		// save input wrap for template/auto-rows/columns
+		if ($variable_line && empty($this->input_wrap_templates[$property])){
+			$this->input_wrap_templates[$property] = $input_wrap_html;
+		}
 
 		// end variable line fields wrap
 		$html.= $variable_line ? '
